@@ -4,7 +4,7 @@
 
 ### Enhancements
 
-- Add `Commanded.Event.EventId` protocol ([#616](https://github.com/commanded/commanded/pull/616)).
+- Add `Commanded.Event.EventId` protocol.
 
 ## v1.4.8
 

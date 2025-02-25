@@ -2,9 +2,11 @@ defmodule Commanded.Mixfile do
   use Mix.Project
 
   @version "1.5.0"
+  @source_url "https://github.com/straw-hat-team/commanded"
 
   def project do
     [
+      name: "Commanded",
       app: :commanded,
       version: @version,
       elixir: "~> 1.12",
@@ -18,13 +20,8 @@ defmodule Commanded.Mixfile do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() == :prod,
       dialyzer: dialyzer(),
-      name: "Commanded",
-      source_url: "https://github.com/commanded/commanded",
-      preferred_cli_env: [
-        setup: :test,
-        reset: :test,
-        "test.all": :test
-      ]
+      source_url: @source_url,
+      preferred_cli_env: preferred_cli_env()
     ]
   end
 
@@ -32,6 +29,14 @@ defmodule Commanded.Mixfile do
     [
       extra_applications: extra_applications(Mix.env()),
       mod: {Commanded, []}
+    ]
+  end
+
+  defp preferred_cli_env do
+    [
+      setup: :test,
+      reset: :test,
+      "test.all": :test
     ]
   end
 
@@ -90,13 +95,14 @@ defmodule Commanded.Mixfile do
 
   defp docs do
     [
-      main: "Commanded",
+      main: "readme",
       canonical: "http://hexdocs.pm/commanded",
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
       extras: [
         "CHANGELOG.md",
+        "README.md",
         "guides/Getting Started.md",
         "guides/Choosing an Event Store.md",
         "guides/Usage.md",
@@ -238,11 +244,11 @@ defmodule Commanded.Mixfile do
         "test/registration/support",
         "test/support"
       ],
-      maintainers: ["Ben Smith"],
+      maintainers: ["Yordis Prieto"],
       licenses: ["MIT"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/commanded/#{@version}/changelog.html",
-        "GitHub" => "https://github.com/commanded/commanded"
+        "Changelog" => "https://github.com/straw-hat-team/commanded/blob/main/CHANGELOG.md",
+        "GitHub" => @source_url
       }
     ]
   end
