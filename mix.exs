@@ -100,51 +100,16 @@ defmodule Commanded.Mixfile do
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
-      extras: [
-        "CHANGELOG.md",
-        "README.md",
-        "guides/Getting Started.md",
-        "guides/Choosing an Event Store.md",
-        "guides/Usage.md",
-        "guides/Application.md",
-        "guides/Aggregates.md",
-        "guides/Commands.md",
-        "guides/Events.md",
-        "guides/Process Managers.md",
-        "guides/Supervision.md",
-        "guides/Serialization.md",
-        "guides/Read Model Projections.md",
-        "guides/Testing.md",
-        "guides/InMemoryEventStore.md",
-        "guides/Deployment.md",
-        "guides/upgrades/0.19-1.0.md": [
-          filename: "0.19-1.0",
-          title: "Upgrade guide v0.19.x to v1.0"
-        ]
-      ],
+      extras:
+        [
+          "README.md",
+          "CHANGELOG.md",
+          LICENSE: [title: "License"]
+        ] ++ Path.wildcard("guides/**/*.{cheatmd,md}"),
       groups_for_extras: [
-        Introduction: [
-          "guides/Getting Started.md",
-          "guides/Choosing an Event Store.md",
-          "guides/Usage.md"
-        ],
-        "Building blocks": [
-          "guides/Application.md",
-          "guides/Aggregates.md",
-          "guides/Commands.md",
-          "guides/Events.md",
-          "guides/Process Managers.md"
-        ],
-        Other: [
-          "guides/Supervision.md",
-          "guides/Serialization.md",
-          "guides/Read Model Projections.md",
-          "guides/Testing.md",
-          "guides/Deployment.md"
-        ],
-        Upgrades: [
-          "guides/upgrades/0.19-1.0.md"
-        ]
+        Explanations: ~r"/explanations/",
+        Cheatsheets: ~r"/cheatsheets/",
+        "How-To's": ~r"/howtos/"
       ],
       groups_for_modules: [
         Aggregates: [

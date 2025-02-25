@@ -73,7 +73,7 @@ You should start your event handlers using an OTP `Supervisor` to ensure they ar
 
 ### Configuration options
 
-You can choose the default error behaviour for *all* of your event handlers in each Application's configuration:
+You can choose the default error behaviour for **all** of your event handlers in each Application's configuration:
 
 ```ellxir
 config :example, ExampleApp,
@@ -84,9 +84,9 @@ The default behaviour is to stop the event handler process when any error is enc
 
 The `:backoff` option, introduced in v1.4.7, cause the even handler to retry after an exponentially increasing backoff period (up to a maximum of 24 hours). The event handler will still not be able to make forward progress until you address the issue, but it won't take your supervisors or applications down with it.
 
-If you want to provide your own strategy, you can pass in a module that implements an `c:error/3` function that matches the `c:error/3` callback mentioned above.
+If you want to provide your own strategy, you can pass in a module that implements an `c:Commanded.Event.Handler.error/3` function that matches the `c:Commanded.Event.Handler.error/3` callback mentioned above.
 
-It's important to note that if your event handler overrides the `error/3` callback, then that will be called instead of the application-wide strategy.
+It's important to note that if your event handler overrides the `c:Commanded.Event.Handler.error/3` callback, then that will be called instead of the application-wide strategy.
 
 ### Subscribing to an individual stream
 
@@ -149,7 +149,6 @@ config :my_app, MyApp.CommandedApp,
 - `c:Commanded.Event.Handler.error/3` - (optional) called when an event handle/2 callback returns an error.
 
 Error event handlers configured on a per handler basis like this will override the application level error handling.
-
 
 ### Metadata
 
@@ -214,8 +213,8 @@ defmodule ExampleHandler do
 
 The available options are `:eventual` (default) and `:strong`:
 
-- *Strong consistency* offers up-to-date data but at the cost of high latency.
-- *Eventual consistency* offers low latency but read model queries may reply with stale data since they may not have processed the persisted events.
+- **Strong consistency** offers up-to-date data but at the cost of high latency.
+- **Eventual consistency** offers low latency but read model queries may reply with stale data since they may not have processed the persisted events.
 
 You request the consistency guarantee, either `:strong` or `:eventual`, when dispatching a command. Strong consistency will block the command dispatch and wait for all strongly consistent event handlers to successfully process all events created by the command. Whereas eventual consistency will immediately return after command dispatch, without waiting for any event handlers, even those configured for strong consistency.
 
