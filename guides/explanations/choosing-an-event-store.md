@@ -4,7 +4,7 @@ You must decide which event store to use with Commanded. You have a choice betwe
 
 - PostgreSQL-based Elixir [EventStore](https://github.com/commanded/eventstore) with `Commanded.EventStore.Adapters.EventStore` Adapter.
 
-There is also an [in-memory event store adapter](https://github.com/commanded/commanded/wiki/In-memory-event-store) for **test use only**.
+There is also an [in-memory event store adapter](./in-memory-event-store.md) for **test use only**.
 
 Want to use a different event store? Then you will need to write your own event store provider as described below.
 
