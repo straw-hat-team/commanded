@@ -2,6 +2,7 @@
 
 Pull requests to contribute new or improved features, and extend documentation are most welcome.
 
-Please follow the existing coding conventions, or refer to the [Elixir style guide](https://github.com/niftyn8/elixir_style_guide).
-
 You should include unit tests to cover any changes. Run `mix test` to execute the test suite.
+
+The documentation is following https://diataxis.fr/ documentation framework as much as possible. Please familiarize
+yourself with Diataxis and organize the content according to the guides.
