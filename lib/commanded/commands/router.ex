@@ -583,7 +583,8 @@ defmodule Commanded.Commands.Router do
             lifespan: @lifespan,
             metadata: metadata,
             middleware: @middleware,
-            retry_attempts: retry_attempts
+            retry_attempts: retry_attempts,
+            stateless: Keyword.get(opts, :experimental_stateless, false)
           }
 
           Dispatcher.dispatch(payload)
