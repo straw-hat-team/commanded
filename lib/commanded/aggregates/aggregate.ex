@@ -50,6 +50,20 @@ defmodule Commanded.Aggregates.Aggregate do
     """
   })
 
+  telemetry_event(%{
+    event: [:commanded, :aggregate, :execute, :wrong_expected_version],
+    description: "Emitted when an aggregate receives a wrong expected version",
+    measurements: "%{count: non_neg_integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_state: struct(),
+      aggregate_version: non_neg_integer(),
+      caller: pid(),
+      execution_context: Commanded.Aggregates.ExecutionContext.t()}
+    """
+  })
+
   @moduledoc """
   Aggregate is a `GenServer` process used to provide access to an
   instance of an event sourced aggregate.
@@ -301,7 +315,7 @@ defmodule Commanded.Aggregates.Aggregate do
     telemetry_metadata = telemetry_metadata(context, from, state)
     start_time = telemetry_start(telemetry_metadata)
 
-    {result, state} = execute_command(context, state)
+    {result, state} = execute_command(context, state, from)
 
     lifespan_timeout =
       case result do
@@ -467,7 +481,7 @@ defmodule Commanded.Aggregates.Aggregate do
     Kernel.apply(handler, before_execute, [aggregate_state, context])
   end
 
-  defp execute_command(%ExecutionContext{} = context, %Aggregate{} = state) do
+  defp execute_command(%ExecutionContext{} = context, %Aggregate{} = state, from) do
     %ExecutionContext{command: command, handler: handler, function: function} = context
     %Aggregate{aggregate_state: aggregate_state} = state
 
@@ -487,14 +501,14 @@ defmodule Commanded.Aggregates.Aggregate do
               {reply, state}
 
             {aggregate_state, pending_events} ->
-              persist_events(pending_events, aggregate_state, context, state)
+              persist_events(pending_events, aggregate_state, context, state, from)
           end
 
         {:ok, pending_events} ->
-          apply_and_persist_events(pending_events, context, state)
+          apply_and_persist_events(pending_events, context, state, from)
 
         pending_events ->
-          apply_and_persist_events(pending_events, context, state)
+          apply_and_persist_events(pending_events, context, state, from)
       end
     else
       {:error, _error} = reply ->
@@ -508,20 +522,20 @@ defmodule Commanded.Aggregates.Aggregate do
       {{:error, error, stacktrace}, state}
   end
 
-  defp apply_and_persist_events(pending_events, context, %Aggregate{} = state) do
+  defp apply_and_persist_events(pending_events, context, %Aggregate{} = state, from) do
     %Aggregate{aggregate_module: aggregate_module, aggregate_state: aggregate_state} = state
 
     pending_events = List.wrap(pending_events)
     aggregate_state = apply_events(aggregate_module, aggregate_state, pending_events)
 
-    persist_events(pending_events, aggregate_state, context, state)
+    persist_events(pending_events, aggregate_state, context, state, from)
   end
 
   defp apply_events(aggregate_module, aggregate_state, events) do
     Enum.reduce(events, aggregate_state, &aggregate_module.apply(&2, &1))
   end
 
-  defp persist_events(pending_events, aggregate_state, context, %Aggregate{} = state) do
+  defp persist_events(pending_events, aggregate_state, context, %Aggregate{} = state, from) do
     %Aggregate{aggregate_version: expected_version} = state
 
     with :ok <- append_to_stream(pending_events, context, state) do
@@ -536,6 +550,8 @@ defmodule Commanded.Aggregates.Aggregate do
       {{:ok, pending_events}, state}
     else
       {:error, :wrong_expected_version} ->
+        telemetry_wrong_expected_version(context, from, state)
+
         # Fetch missing events from event store
         state = AggregateStateBuilder.rebuild_from_events(state)
 
@@ -544,7 +560,7 @@ defmodule Commanded.Aggregates.Aggregate do
           {:ok, context} ->
             Logger.debug(describe(state) <> " wrong expected version, retrying command")
 
-            execute_command(context, state)
+            execute_command(context, state, from)
 
           reply ->
             Logger.debug(describe(state) <> " wrong expected version, but not retrying command")
@@ -603,6 +619,16 @@ defmodule Commanded.Aggregates.Aggregate do
       end
 
     noreply_with_lifespan(state)
+  end
+
+  defp telemetry_wrong_expected_version(context, from, state) do
+    telemetry_metadata = telemetry_metadata(context, from, state)
+
+    :telemetry.execute(
+      [:commanded, :aggregate, :execute, :wrong_expected_version],
+      %{count: 1},
+      telemetry_metadata
+    )
   end
 
   defp telemetry_start(telemetry_metadata) do
