@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  Please:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Load 1Password Secrets
+        uses: 1password/load-secrets-action@v2.0.0
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GITHUB_SHT_BOT_PAT: "${{ secrets.SECRET_VAULT }}/GITHUB_SHT_BOT_PAT"
+
+      - id: release
+        name: Release
+        uses: googleapis/release-please-action@v4.2.0
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
+          release-type: elixir
+          target-branch: main
+          token: ${{ env.GITHUB_SHT_BOT_PAT }}
