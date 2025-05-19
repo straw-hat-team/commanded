@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/straw-hat-team/commanded/compare/v1.5.0...v1.6.0) (2025-05-19)
+
+
+### Features
+
+* add telemetry for wrong expected version in aggregates ([#8](https://github.com/straw-hat-team/commanded/issues/8)) ([fe41c8a](https://github.com/straw-hat-team/commanded/commit/fe41c8ac971920fb9cfafb4dbd9fdf8d7b1286b0))
+
 ## v1.5.0
 
 ### Enhancements
