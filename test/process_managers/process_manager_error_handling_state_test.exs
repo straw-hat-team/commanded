@@ -11,6 +11,7 @@ defmodule Commanded.ProcessManager.ProcessManagerErrorHandlingStateTest do
     StateErrorHandlingProcessManager
   }
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.UUID
 
@@ -39,8 +40,8 @@ defmodule Commanded.ProcessManager.ProcessManagerErrorHandlingStateTest do
 
     assert match?(
              %FailureContext{
-               enriched_metadata: %{
-                 "user_id" => 1234,
+               enriched_metadata: %EnrichedMetadata{
+                 metadata: %{"user_id" => 1234},
                  application: ErrorApp,
                  causation_id: _causation_id,
                  correlation_id: _correlation_id,

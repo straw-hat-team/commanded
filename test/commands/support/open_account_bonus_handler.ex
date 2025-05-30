@@ -5,14 +5,15 @@ defmodule Commanded.Commands.OpenAccountBonusHandler do
     application: BankApp,
     name: "OpenAccountBonus"
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.ExampleDomain.BankAccount.Commands.DepositMoney
   alias Commanded.ExampleDomain.BankAccount.Events.BankAccountOpened
   alias Commanded.ExampleDomain.BankRouter
   alias Commanded.UUID
 
-  def handle(%BankAccountOpened{} = command, metadata) do
+  def handle(%BankAccountOpened{} = command, %EnrichedMetadata{} = metadata) do
     %BankAccountOpened{account_number: account_number} = command
-    %{event_id: causation_id, correlation_id: correlation_id} = metadata
+    %EnrichedMetadata{event_id: causation_id, correlation_id: correlation_id} = metadata
 
     deposit_welcome_bonus = %DepositMoney{
       account_number: account_number,
