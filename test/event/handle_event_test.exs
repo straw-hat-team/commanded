@@ -12,6 +12,7 @@ defmodule Commanded.Event.HandleEventTest do
   alias Commanded.Event.ReplyEvent
   alias Commanded.Event.UninterestingEvent
   alias Commanded.EventStore
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.ExampleDomain.BankAccount.Events.BankAccountOpened
   alias Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited
@@ -202,10 +203,12 @@ defmodule Commanded.Event.HandleEventTest do
 
         [metadata] = AppendingEventHandler.received_metadata()
 
-        assert Map.get(metadata, :event_number) == 2
-        assert Map.get(metadata, :stream_id) == stream_uuid
-        assert Map.get(metadata, :stream_version) == 2
-        assert %DateTime{} = Map.get(metadata, :created_at)
+        assert %EnrichedMetadata{
+                 event_number: 2,
+                 stream_id: ^stream_uuid,
+                 stream_version: 2,
+                 created_at: %DateTime{}
+               } = metadata
 
         %Handler{last_seen_event: last_seen_event} = :sys.get_state(handler)
         assert last_seen_event == 2
@@ -234,8 +237,10 @@ defmodule Commanded.Event.HandleEventTest do
         assert pluck(received_metadata, :stream_version) == [1, 2]
 
         Enum.each(received_metadata, fn metadata ->
-          assert Map.get(metadata, :stream_id) == stream_uuid
-          assert %DateTime{} = Map.get(metadata, :created_at)
+          assert %EnrichedMetadata{
+                   stream_id: ^stream_uuid,
+                   created_at: %DateTime{}
+                 } = metadata
         end)
       end)
     end

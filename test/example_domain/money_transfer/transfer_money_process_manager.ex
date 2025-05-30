@@ -5,6 +5,7 @@ defmodule Commanded.ExampleDomain.TransferMoneyProcessManager do
     application: Commanded.ExampleDomain.BankApp,
     name: __MODULE__
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.ExampleDomain.BankAccount.Commands.{DepositMoney, WithdrawMoney}
   alias Commanded.ExampleDomain.BankAccount.Events.{MoneyDeposited, MoneyWithdrawn}
   alias Commanded.ExampleDomain.MoneyTransfer.Events.MoneyTransferRequested
@@ -25,7 +26,7 @@ defmodule Commanded.ExampleDomain.TransferMoneyProcessManager do
   def handle(
         %TransferMoneyProcessManager{},
         %MoneyTransferRequested{} = event,
-        %{"user_uuid" => by_user} = _metadata
+        %EnrichedMetadata{metadata: %{"user_uuid" => by_user}}
       ) do
     %MoneyTransferRequested{
       transfer_uuid: transfer_uuid,
@@ -70,7 +71,7 @@ defmodule Commanded.ExampleDomain.TransferMoneyProcessManager do
   def apply(
         %TransferMoneyProcessManager{} = transfer,
         %MoneyTransferRequested{} = event,
-        %{"user_uuid" => user_uuid} = _metadata
+        %EnrichedMetadata{metadata: %{"user_uuid" => user_uuid}}
       ) do
     %MoneyTransferRequested{
       transfer_uuid: transfer_uuid,

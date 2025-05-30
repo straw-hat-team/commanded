@@ -30,6 +30,7 @@ defmodule Commanded.EventStore.RecordedEvent do
 
   """
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.EventStore.RecordedEvent
 
   @type causation_id :: uuid() | nil
@@ -58,18 +59,6 @@ defmodule Commanded.EventStore.RecordedEvent do
           created_at: created_at()
         }
 
-  @type enriched_metadata :: %{
-          :event_id => event_id(),
-          :event_number => event_number(),
-          :stream_id => stream_id(),
-          :stream_version => stream_version(),
-          :correlation_id => correlation_id(),
-          :causation_id => causation_id(),
-          :created_at => created_at(),
-          optional(atom()) => term(),
-          optional(String.t()) => term()
-        }
-
   defstruct [
     :event_id,
     :event_number,
@@ -87,7 +76,7 @@ defmodule Commanded.EventStore.RecordedEvent do
   Enrich the event's metadata with fields from the `RecordedEvent` struct and
   any additional metadata passed as an option.
   """
-  @spec enrich_metadata(t(), [{:additional_metadata, map()}]) :: enriched_metadata()
+  @spec enrich_metadata(t(), [{:additional_metadata, map()}]) :: EnrichedMetadata.t()
   def enrich_metadata(%RecordedEvent{} = event, opts) do
     %RecordedEvent{
       event_id: event_id,
@@ -102,16 +91,18 @@ defmodule Commanded.EventStore.RecordedEvent do
 
     additional_metadata = Keyword.get(opts, :additional_metadata, %{})
 
-    %{
+    %EnrichedMetadata{
       event_id: event_id,
       event_number: event_number,
       stream_id: stream_id,
       stream_version: stream_version,
       correlation_id: correlation_id,
       causation_id: causation_id,
-      created_at: created_at
+      created_at: created_at,
+      application: Map.get(additional_metadata, :application),
+      handler_name: Map.get(additional_metadata, :handler_name),
+      state: Map.get(additional_metadata, :state),
+      metadata: metadata || %{}
     }
-    |> Map.merge(metadata || %{})
-    |> Map.merge(additional_metadata)
   end
 end

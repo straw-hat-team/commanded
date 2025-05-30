@@ -1,6 +1,7 @@
 defmodule Commanded.ProcessManagers.AfterCommandProcessManager do
   @moduledoc false
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.ProcessManagers.AfterCommandProcessManager
   alias Commanded.ProcessManagers.ExampleAggregate.Commands.{Continue, Stop}
   alias Commanded.ProcessManagers.ExampleAggregate.Events.{Interested, Started}
@@ -43,8 +44,9 @@ defmodule Commanded.ProcessManagers.AfterCommandProcessManager do
   end
 
   # after_command/3 callback
-  def after_command(%AfterCommandProcessManager{}, %Continue{}, metadata) do
-    %{"notify_to" => notify_to} = metadata
+  def after_command(%AfterCommandProcessManager{}, %Continue{}, %EnrichedMetadata{} = metadata) do
+    %EnrichedMetadata{metadata: user_metadata} = metadata
+    %{"notify_to" => notify_to} = user_metadata
 
     notify_to
     |> :erlang.list_to_pid()

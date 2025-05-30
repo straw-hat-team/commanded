@@ -398,7 +398,9 @@ defmodule ExampleHandler do
     application: ExampleApp,
     name: "ExampleHandler"
 
-  def handle(%AnEvent{..}, %{event_id: causation_id, correlation_id: correlation_id}) do
+  alias Commanded.EventStore.EnrichedMetadata
+
+  def handle(%AnEvent{..}, %EnrichedMetadata{event_id: causation_id, correlation_id: correlation_id}) do
     command = %ExampleCommand{..}
 
     BankApp.dispatch(command,
@@ -487,7 +489,7 @@ defmodule BankingRouter do
 end
 ```
 
-The middleware modules are executed in the order they’ve been defined. They will receive a `Commanded.Middleware.Pipeline` struct containing the command being dispatched, in the `:command` field.
+The middleware modules are executed in the order they've been defined. They will receive a `Commanded.Middleware.Pipeline` struct containing the command being dispatched, in the `:command` field.
 
 ### Example middleware
 
