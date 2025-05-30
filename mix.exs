@@ -1,10 +1,12 @@
 defmodule Commanded.Mixfile do
   use Mix.Project
 
-  @version "1.4.8"
+  @version "1.6.0"
+  @source_url "https://github.com/straw-hat-team/commanded"
 
   def project do
     [
+      name: "Commanded",
       app: :commanded,
       version: @version,
       elixir: "~> 1.12",
@@ -18,8 +20,8 @@ defmodule Commanded.Mixfile do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() == :prod,
       dialyzer: dialyzer(),
-      name: "Commanded",
-      source_url: "https://github.com/commanded/commanded"
+      source_url: @source_url,
+      preferred_cli_env: preferred_cli_env()
     ]
   end
 
@@ -27,6 +29,14 @@ defmodule Commanded.Mixfile do
     [
       extra_applications: extra_applications(Mix.env()),
       mod: {Commanded, []}
+    ]
+  end
+
+  defp preferred_cli_env do
+    [
+      setup: :test,
+      reset: :test,
+      "test.all": :test
     ]
   end
 
@@ -64,6 +74,7 @@ defmodule Commanded.Mixfile do
       # Optional dependencies
       {:jason, "~> 1.4", optional: true},
       {:phoenix_pubsub, "~> 2.1", optional: true},
+      {:eventstore, "~> 1.4", optional: true},
 
       # Build and test tools
       {:benchfella, "~> 0.3", only: :bench},
@@ -84,55 +95,21 @@ defmodule Commanded.Mixfile do
 
   defp docs do
     [
-      main: "Commanded",
+      main: "readme",
       canonical: "http://hexdocs.pm/commanded",
       source_ref: "v#{@version}",
       extra_section: "GUIDES",
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
-      extras: [
-        "CHANGELOG.md",
-        "guides/Getting Started.md",
-        "guides/Choosing an Event Store.md",
-        "guides/Usage.md",
-        "guides/Application.md",
-        "guides/Aggregates.md",
-        "guides/Commands.md",
-        "guides/Events.md",
-        "guides/Process Managers.md",
-        "guides/Supervision.md",
-        "guides/Serialization.md",
-        "guides/Read Model Projections.md",
-        "guides/Testing.md",
-        "guides/InMemoryEventStore.md",
-        "guides/Deployment.md",
-        "guides/upgrades/0.19-1.0.md": [
-          filename: "0.19-1.0",
-          title: "Upgrade guide v0.19.x to v1.0"
-        ]
-      ],
+      extras:
+        [
+          "README.md",
+          "CHANGELOG.md",
+          LICENSE: [title: "License"]
+        ] ++ Path.wildcard("guides/**/*.{cheatmd,md}"),
       groups_for_extras: [
-        Introduction: [
-          "guides/Getting Started.md",
-          "guides/Choosing an Event Store.md",
-          "guides/Usage.md"
-        ],
-        "Building blocks": [
-          "guides/Application.md",
-          "guides/Aggregates.md",
-          "guides/Commands.md",
-          "guides/Events.md",
-          "guides/Process Managers.md"
-        ],
-        Other: [
-          "guides/Supervision.md",
-          "guides/Serialization.md",
-          "guides/Read Model Projections.md",
-          "guides/Testing.md",
-          "guides/Deployment.md"
-        ],
-        Upgrades: [
-          "guides/upgrades/0.19-1.0.md"
-        ]
+        Explanations: ~r"/explanations/",
+        Cheatsheets: ~r"/cheatsheets/",
+        "How-To's": ~r"/howtos/"
       ],
       groups_for_modules: [
         Aggregates: [
@@ -154,7 +131,8 @@ defmodule Commanded.Mixfile do
           Commanded.Event.FailureContext,
           Commanded.Event.Handler,
           Commanded.Event.Mapper,
-          Commanded.Event.Upcaster
+          Commanded.Event.Upcaster,
+          Commanded.Event.EventId
         ],
         "Process Managers": [
           Commanded.ProcessManagers.FailureContext,
@@ -231,17 +209,21 @@ defmodule Commanded.Mixfile do
         "test/registration/support",
         "test/support"
       ],
-      maintainers: ["Ben Smith"],
+      maintainers: ["Yordis Prieto"],
       licenses: ["MIT"],
       links: %{
-        "Changelog" => "https://hexdocs.pm/commanded/#{@version}/changelog.html",
-        "GitHub" => "https://github.com/commanded/commanded"
+        "Changelog" => "https://github.com/straw-hat-team/commanded/blob/main/CHANGELOG.md",
+        "GitHub" => @source_url
       }
     ]
   end
 
   defp aliases do
-    []
+    [
+      reset: ["event_store.drop", "setup"],
+      setup: ["event_store.create", "event_store.init"],
+      "test.all": ["test --include distributed --include eventstore_adapter"]
+    ]
   end
 
   defp dialyzer do
