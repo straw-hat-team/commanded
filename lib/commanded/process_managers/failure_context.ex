@@ -19,11 +19,12 @@ defmodule Commanded.ProcessManagers.FailureContext do
     - `stacktrace` - the stacktrace if the error was an unhandled exception.
 
   """
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.EventStore.RecordedEvent
 
   @type t :: %__MODULE__{
           context: map(),
-          enriched_metadata: RecordedEvent.enriched_metadata(),
+          enriched_metadata: EnrichedMetadata.t(),
           last_event: RecordedEvent.t(),
           pending_commands: [struct()],
           process_manager_state: struct(),

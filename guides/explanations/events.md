@@ -152,13 +152,13 @@ Error event handlers configured on a per handler basis like this will override t
 
 ### Metadata
 
-The `handle/2` function in your handler receives the domain event and a map of metadata associated with that event. You can provide the metadata key/value pairs when dispatching a command:
+The `handle/2` function in your handler receives the domain event and an `t:Commanded.EventStore.EnrichedMetadata.t()` struct associated with that event. You can provide the metadata key/value pairs when dispatching a command:
 
 ```elixir
 :ok = ExampleApp.dispatch(command, metadata: %{"issuer_id" => issuer_id, "user_id" => "user@example.com"})
 ```
 
-In addition to the metadata key/values you provide, the following system values will be included in the metadata passed to an event handler:
+In addition to the metadata key/values you provide, the `t:Commanded.EventStore.EnrichedMetadata.t()` struct includes the following system values:
 
 - `application` - the `Commanded.Application` associated with the event handler.
 - `handler_name` - the name of the event handler.
@@ -170,8 +170,9 @@ In addition to the metadata key/values you provide, the following system values 
 - `causation_id` - an optional UUID identifier used to identify which command caused the event.
 - `correlation_id` - an optional UUID identifier used to correlate related commands/events.
 - `created_at` - the datetime, in UTC, indicating when the event was created.
+- `metadata` - the user-provided metadata as a string-keyed map.
 
-These key/value metadata pairs will use atom keys to differentiate them from the user provided metadata:
+Example usage:
 
 ```elixir
 defmodule ExampleHandler do
@@ -179,20 +180,20 @@ defmodule ExampleHandler do
     application: ExampleApp,
     name: "ExampleHandler"
 
-  @impl Commanded.Event.Handler
-  def handle(event, metadata) do
-    IO.inspect(metadata)
-    # %{
-    #   :causation_id => "db1ebd30-7d3c-40f7-87cd-12cd9966df32",
-    #   :correlation_id => "1599630b-9c38-433c-9548-0dd793108ba0",
-    #   :created_at => #DateTime<2017-10-30 11:19:56.178901Z>,
-    #   :event_id => "5e4a0f38-385b-4d57-823b-a1bcf705b7bb",
-    #   :event_number => 12345,
-    #   :stream_id => "e42a588d-2cda-4314-a471-5d008cce01fc",
-    #   :stream_version => 1,
-    #   "issuer_id" => "0768d69a-d2b7-48f4-d0e9-083a97f7ebe0",
-    #   "user_id" => "user@example.com"
-    # }
+  alias Commanded.EventStore.EnrichedMetadata
+
+  def handle(%ExampleEvent{} = event, %EnrichedMetadata{} = metadata) do
+    %EnrichedMetadata{
+      event_id: event_id,
+      stream_id: stream_id,
+      created_at: created_at,
+      metadata: user_metadata
+    } = metadata
+
+    # Access user-provided metadata
+    user_id = Map.get(user_metadata, "user_id")
+
+    # ... handle event ...
 
     :ok
   end
