@@ -26,3 +26,9 @@ approach particularly valuable for mission-critical applications.
 
 The project is following https://diataxis.fr/ documentation framework. Check
 the Explanations, API Reference, How-To's and Tutorials guides.
+
+### Attribution
+
+`Commanded` is based on [github.com/commanded/commanded](https://github.com/commanded/commanded).
+This fork introduces new features with an independent release cycle, allowing
+for thorough testing before contributing back to the original project.
