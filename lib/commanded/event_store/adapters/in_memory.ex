@@ -639,7 +639,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
     %RecordedEvent{
       recorded_event
       | data: serializer.deserialize(data, type: event_type),
-        metadata: serializer.deserialize(metadata)
+        metadata: serializer.deserialize(metadata, [])
     }
   end
 
@@ -650,7 +650,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
     %SnapshotData{
       snapshot
       | data: serializer.deserialize(data, type: source_type),
-        metadata: serializer.deserialize(metadata)
+        metadata: serializer.deserialize(metadata, [])
     }
   end
 

@@ -14,8 +14,10 @@ defprotocol Commanded.Event.Upcaster do
 
   ## Example
 
+      alias Commanded.EventStore.EnrichedMetadata
+
       defimpl Commanded.Event.Upcaster, for: AnEvent do
-        def upcast(%AnEvent{} = event, _metadata) do
+        def upcast(%AnEvent{} = event, %EnrichedMetadata{} = metadata) do
           %AnEvent{name: name} = event
 
           %AnEvent{event | first_name: name}
@@ -24,11 +26,10 @@ defprotocol Commanded.Event.Upcaster do
 
   ## Metadata
 
-  The `upcast/2` function receives the domain event and a map of metadata
-  associated with that event. The metadata is provided during command dispatch.
+  The `upcast/2` function receives the domain event and an `EnrichedMetadata` struct
+  associated with that event.
 
-  In addition to the metadata key/values you provide, the following system
-  values will be included in the metadata:
+  The `EnrichedMetadata` struct contains the following fields:
 
     - `application` - the `Commanded.Application` used to read the event.
     - `event_id` - a globally unique UUID to identify the event.
@@ -42,14 +43,14 @@ defprotocol Commanded.Event.Upcaster do
       commands/events.
     - `created_at` - the datetime, in UTC, indicating when the event was
       created.
-
-  These key/value metadata pairs will use atom keys to differentiate them from
-  the user provided metadata which uses string keys.
+    - `metadata` - the user-provided metadata as a string-keyed map.
 
   """
 
+  alias Commanded.EventStore.EnrichedMetadata
+
   @fallback_to_any true
-  @spec upcast(event :: struct(), metadata :: map()) :: struct()
+  @spec upcast(event :: struct(), metadata :: EnrichedMetadata.t()) :: struct()
   def upcast(event, metadata)
 end
 
@@ -60,5 +61,7 @@ defimpl Commanded.Event.Upcaster, for: Any do
   This will return an event unchanged.
   """
 
-  def upcast(event, _metadata), do: event
+  alias Commanded.EventStore.EnrichedMetadata
+
+  def upcast(event, %EnrichedMetadata{}), do: event
 end

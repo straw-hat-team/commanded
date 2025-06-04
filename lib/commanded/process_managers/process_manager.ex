@@ -296,7 +296,7 @@ defmodule Commanded.ProcessManagers.ProcessManager do
 
   """
 
-  alias Commanded.EventStore.RecordedEvent
+  alias Commanded.EventStore.EnrichedMetadata
 
   alias Commanded.ProcessManagers.{
     FailureContext,
@@ -306,7 +306,6 @@ defmodule Commanded.ProcessManagers.ProcessManager do
   }
 
   @type domain_event :: struct()
-  @type enriched_metadata :: RecordedEvent.enriched_metadata()
   @type command :: struct()
   @type process_manager :: struct()
   @type process_uuid :: String.t() | [String.t()]
@@ -369,7 +368,7 @@ defmodule Commanded.ProcessManagers.ProcessManager do
   problematic event.
 
   """
-  @callback interested?(domain_event, enriched_metadata) ::
+  @callback interested?(domain_event, EnrichedMetadata.t()) ::
               {:start, process_uuid}
               | {:start!, process_uuid}
               | {:continue, process_uuid}
@@ -393,7 +392,7 @@ defmodule Commanded.ProcessManagers.ProcessManager do
   after a specific command or if you would instead use the `c:interested?/2`
   stop mechanism.
   """
-  @callback after_command(process_manager, command, enriched_metadata) :: :continue | :stop
+  @callback after_command(process_manager, command, EnrichedMetadata.t()) :: :continue | :stop
 
   @doc """
   Process manager instance handles a domain event, returning any commands to
@@ -416,7 +415,7 @@ defmodule Commanded.ProcessManagers.ProcessManager do
   The `c:handle/3` function can be omitted if you do not need to dispatch a
   command and are only mutating the process manager's state.
   """
-  @callback handle(process_manager, domain_event, enriched_metadata) ::
+  @callback handle(process_manager, domain_event, EnrichedMetadata.t()) ::
               command | list(command) | {:error, term}
 
   @doc """
@@ -436,7 +435,7 @@ defmodule Commanded.ProcessManagers.ProcessManager do
   This callback function is optional, the default behaviour is to retain the
   process manager's current state.
   """
-  @callback apply(process_manager, domain_event, enriched_metadata) :: process_manager
+  @callback apply(process_manager, domain_event, EnrichedMetadata.t()) :: process_manager
 
   @doc """
   Called when a command dispatch or event handling returns an error.

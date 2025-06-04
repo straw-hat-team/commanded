@@ -27,13 +27,16 @@ defmodule Commanded.ProcessManagers.RoutingProcessManager do
     defstruct [:process_uuid, :reply_to, :on_error]
   end
 
+  alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.ProcessManagers.FailureContext
   alias Commanded.ProcessManagers.RoutingProcessManager
 
   defstruct [:processes]
 
-  def interested?(%StartedFromMetadata{}, %{"process_uuid" => process_uuid} = _metadata),
-    do: {:start, process_uuid}
+  def interested?(%StartedFromMetadata{}, %EnrichedMetadata{
+        metadata: %{"process_uuid" => process_uuid}
+      }),
+      do: {:start, process_uuid}
 
   def interested?(%Started{process_uuid: process_uuid, strict?: true}),
     do: {:start!, process_uuid}

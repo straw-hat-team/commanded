@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.0.0](https://github.com/straw-hat-team/commanded/compare/v1.6.0...v2.0.0) (2025-05-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* introduce EnrichedMetadata struct for enhanced event metadata handling ([#11](https://github.com/straw-hat-team/commanded/issues/11))
+
+### Features
+
+* add serializer behaviour ([#14](https://github.com/straw-hat-team/commanded/issues/14)) ([fa81870](https://github.com/straw-hat-team/commanded/commit/fa818701e437f36e2f3afe6732b39f117b034d19))
+* introduce EnrichedMetadata struct for enhanced event metadata handling ([#11](https://github.com/straw-hat-team/commanded/issues/11)) ([7772579](https://github.com/straw-hat-team/commanded/commit/77725791c7f10667baec4e76bd6f16983f52b118))
+
+## [1.6.0](https://github.com/straw-hat-team/commanded/compare/v1.5.0...v1.6.0) (2025-05-19)
+
+
+### Features
+
+* add telemetry for wrong expected version in aggregates ([#8](https://github.com/straw-hat-team/commanded/issues/8)) ([fe41c8a](https://github.com/straw-hat-team/commanded/commit/fe41c8ac971920fb9cfafb4dbd9fdf8d7b1286b0))
+
 ## v1.5.0
 
 ### Enhancements

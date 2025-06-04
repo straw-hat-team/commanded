@@ -1,5 +1,5 @@
 defmodule Commanded.Aggregates.AggregateTelemetryTest do
-  use ExUnit.Case
+  use Commanded.MockEventStoreCase
 
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.{DefaultApp, UUID}
@@ -228,12 +228,72 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
                metadata
              )
     end
+
+    test "emit `[:commanded, :aggregate, :execute, :wrong_expected_version]` event" do
+      aggregate_uuid = UUID.uuid4()
+
+      expect(MockEventStore, :subscribe, fn _event_store_meta, aggregate_uuid ->
+        assert is_binary(aggregate_uuid)
+        :ok
+      end)
+
+      expect(MockEventStore, :append_to_stream, fn _meta,
+                                                   ^aggregate_uuid,
+                                                   _exp_ver,
+                                                   _event_data,
+                                                   _opts ->
+        {:error, :wrong_expected_version}
+      end)
+
+      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+        []
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: Commanded.MockedApp)
+
+      assert {:error, :too_many_attempts} =
+               Aggregate.execute(
+                 Commanded.MockedApp,
+                 ExampleAggregate,
+                 aggregate_uuid,
+                 %ExecutionContext{
+                   command: %Ok{message: "ok"},
+                   function: :execute,
+                   handler: ExampleAggregate,
+                   retry_attempts: 0
+                 }
+               )
+
+      assert_receive {[:commanded, :aggregate, :execute, :wrong_expected_version], measurements,
+                      metadata}
+
+      assert measurements == %{count: 1}
+      assert metadata.application == Commanded.MockedApp
+      assert metadata.aggregate_uuid == aggregate_uuid
+      assert metadata.aggregate_version == 0
+      assert metadata.aggregate_state == %ExampleAggregate{message: nil}
+      assert metadata.caller == self()
+      assert metadata.execution_context.command == %Ok{message: "ok"}
+      assert metadata.execution_context.retry_attempts == 0
+    end
   end
 
   def start_aggregate(aggregate_uuid) do
     Aggregate.start_link([application: DefaultApp],
       aggregate_module: ExampleAggregate,
       aggregate_uuid: aggregate_uuid
+    )
+  end
+
+  def start_aggregate(aggregate_uuid, opts) do
+    aggregate = ExampleAggregate
+    app = Keyword.fetch!(opts, :application)
+    name = Aggregate.name(app, aggregate, aggregate_uuid)
+
+    Aggregate.start_link([application: app],
+      aggregate_module: aggregate,
+      aggregate_uuid: aggregate_uuid,
+      name: Commanded.Registration.via_tuple(app, name)
     )
   end
 
@@ -244,17 +304,20 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
         [:commanded, :aggregate, :execute, :start],
         [:commanded, :aggregate, :execute, :stop],
         [:commanded, :aggregate, :execute, :exception],
+        [:commanded, :aggregate, :execute, :wrong_expected_version],
         [:commanded, :aggregate, :populate, :start],
         [:commanded, :aggregate, :populate, :stop]
       ],
-      fn event_name, measurements, metadata, reply_to ->
-        send(reply_to, {event_name, measurements, metadata})
-      end,
+      &__MODULE__.send_self(&1, &2, &3, &4),
       self()
     )
 
     on_exit(fn ->
       :telemetry.detach("test-handler")
     end)
+  end
+
+  def send_self(event_name, measurements, metadata, reply_to) do
+    send(reply_to, {event_name, measurements, metadata})
   end
 end
