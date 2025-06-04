@@ -126,6 +126,7 @@ defmodule BankAccount do
   defstruct [:account_number, :balance]
 
   alias Commanded.Aggregates.Aggregate
+
   @behaviour Aggregate
 
   # Public API
