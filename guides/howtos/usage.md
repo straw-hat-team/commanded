@@ -41,10 +41,11 @@ Here's an example bank account opening feature built using Commanded to demonstr
 
      alias Commanded.Aggregates.Aggregate
 
-    @behaviour Aggregate
+     @behaviour Aggregate
 
      # Public command API
 
+     @impl Aggregate
      def execute(%BankAccount{account_number: nil}, %OpenBankAccount{account_number: account_number, initial_balance: initial_balance})
        when initial_balance > 0
      do
