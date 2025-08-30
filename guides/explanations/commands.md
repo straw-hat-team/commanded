@@ -415,6 +415,16 @@ Commands dispatched by a process manager will be automatically assigned the appr
 
 You can use [Commanded audit middleware](https://hex.pm/packages/commanded_audit_middleware) to record every dispatched command. This allows you to follow the chain of commands and events by using the causation id. The correlation id can be used to find all related commands and events.
 
+#### Configuring UUID provider
+
+By default, Commanded uses `Uniq.UUID` for correlation and causation IDs. Configure an alternative:
+
+```elixir
+config :commanded, Commanded.UUID, module: Ecto.UUID
+```
+
+Your custom module must provide a `uuid4/0` function.
+
 ### Event metadata
 
 It's helpful for debugging to have additional metadata associated with events issued by a command. You can set it when dispatching a command:

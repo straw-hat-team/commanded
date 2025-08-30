@@ -66,6 +66,7 @@ defmodule Commanded.Mixfile do
   defp deps do
     [
       {:backoff, "~> 1.1"},
+      {:uniq, "~> 0.6.1"},
 
       # Telemetry
       {:telemetry, "~> 0.4 or ~> 1.0"},
