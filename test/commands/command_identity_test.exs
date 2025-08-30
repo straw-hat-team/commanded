@@ -18,7 +18,7 @@ defmodule Commanded.Commands.CommandIdentityTest do
       command = %OpenAccount{account_number: "ACC123", initial_balance: 1_000}
       :ok = BankApp.dispatch(command)
       [command_uuid] = CommandAuditMiddleware.dispatched_commands(& &1.command_uuid)
-      assert is_binary(UUID.string_to_binary!(command_uuid))
+      assert {:ok, _} = Uniq.UUID.parse(command_uuid)
     end
 
     test "should accept provided command_uuid" do

@@ -243,7 +243,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
     end
 
     defp assert_is_uuid(uuid) do
-      assert uuid |> UUID.string_to_binary!() |> is_binary()
+      assert {:ok, _} = Uniq.UUID.parse(uuid)
     end
 
     # Returns `true` if module implements behaviour.
