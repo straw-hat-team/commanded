@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.0](https://github.com/straw-hat-team/commanded/compare/v2.0.0...v2.1.0) (2025-08-30)
+
+
+### Features
+
+* Add aggregate behaviour ([31337cb](https://github.com/straw-hat-team/commanded/commit/31337cbb7f93b7c7ac77b8a33dae0285ffe492d5))
+* add batch support ([#18](https://github.com/straw-hat-team/commanded/issues/18)) ([b593f04](https://github.com/straw-hat-team/commanded/commit/b593f040bca4ddedc29f0787d82f484aa699d196))
+* add configurable UUID provider using Uniq.UUID ([deb4f8f](https://github.com/straw-hat-team/commanded/commit/deb4f8ffe0d33a24cbe8e55d2584bd8af2047924))
+
+
+### Bug Fixes
+
+* make take snapshot sync call ([#20](https://github.com/straw-hat-team/commanded/issues/20)) ([57d0b6a](https://github.com/straw-hat-team/commanded/commit/57d0b6a118dfd218b7656d35daa6aaee5b322eae))
+
 ## [2.0.0](https://github.com/straw-hat-team/commanded/compare/v1.6.0...v2.0.0) (2025-05-30)
 
 
