@@ -70,6 +70,10 @@ defmodule Commanded.Subscriptions do
     - `:exclude` - a PID, or list of PIDs, to exclude from waiting.
 
   Returns `:ok` on success, or `{:error, :timeout}` on failure due to timeout.
+
+  Note: The `:timeout` atom error cannot be transformed to a struct error as it's part
+  of the internal subscription waiting protocol and changing it would require updating
+  all subscription consumers.
   """
   def wait_for(
         application,
@@ -87,6 +91,7 @@ defmodule Commanded.Subscriptions do
     after
       timeout ->
         :ok = GenServer.call(name, {:unsubscribe, self()})
+        # Cannot transform to struct error - part of internal subscription protocol
         {:error, :timeout}
     end
   end
@@ -319,7 +324,8 @@ defmodule Commanded.Subscriptions do
     Application.get_env(:commanded, :subscriptions_ttl, @default_ttl)
   end
 
-  defp default_consistency_timeout do
+  @doc false
+  def default_consistency_timeout do
     Application.get_env(:commanded, :dispatch_consistency_timeout, @default_consistency_timeout)
   end
 end

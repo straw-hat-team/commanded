@@ -166,13 +166,13 @@ defmodule Commanded.EventStore.Adapters.InMemory do
           persist_events(state, stream_uuid, stream_events, events)
 
         {:no_stream, stream_events} when is_list(stream_events) ->
-          {{:error, :stream_exists}, state}
+          {{:error, Commanded.StreamExists.new()}, state}
 
         {:no_stream, nil} ->
           persist_events(state, stream_uuid, [], events)
 
         {:stream_exists, nil} ->
-          {{:error, :stream_not_found}, state}
+          {{:error, Commanded.StreamNotFound.new()}, state}
 
         {:stream_exists, stream_events} ->
           persist_events(state, stream_uuid, stream_events, events)
@@ -181,11 +181,12 @@ defmodule Commanded.EventStore.Adapters.InMemory do
           persist_events(state, stream_uuid, [], events)
 
         {expected_version, nil} when is_integer(expected_version) ->
-          {{:error, :wrong_expected_version}, state}
+          {{:error, Commanded.WrongExpectedVersion.new(expected_version: expected_version, actual_version: nil)}, state}
 
         {expected_version, stream_events}
         when is_integer(expected_version) and length(stream_events) != expected_version ->
-          {{:error, :wrong_expected_version}, state}
+          actual_version = length(stream_events)
+          {{:error, Commanded.WrongExpectedVersion.new(expected_version: expected_version, actual_version: actual_version)}, state}
 
         {expected_version, stream_events}
         when is_integer(expected_version) and length(stream_events) == expected_version ->
@@ -202,7 +203,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
     reply =
       case Map.get(streams, stream_uuid) do
         nil ->
-          {:error, :stream_not_found}
+          {:error, Commanded.StreamNotFound.new(stream_uuid)}
 
         events ->
           events
@@ -245,7 +246,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
           start_persistent_subscription(state, subscription, subscriber)
 
         %PersistentSubscription{concurrency_limit: nil} ->
-          {{:error, :subscription_already_exists}, state}
+          {{:error, Commanded.SubscriptionAlreadyExists.new(subscription_name)}, state}
 
         %PersistentSubscription{} = subscription ->
           %PersistentSubscription{concurrency_limit: concurrency_limit, subscribers: subscribers} =
@@ -254,7 +255,8 @@ defmodule Commanded.EventStore.Adapters.InMemory do
           if length(subscribers) < concurrency_limit do
             start_persistent_subscription(state, subscription, subscriber)
           else
-            {{:error, :too_many_subscribers}, state}
+            current_count = length(subscribers)
+            {{:error, Commanded.TooManySubscribers.new(max_subscribers: concurrency_limit, current_count: current_count, subscription_name: subscription_name)}, state}
           end
       end
 
@@ -288,7 +290,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
           {:ok, state}
 
         nil ->
-          {{:error, :subscription_not_found}, state}
+          {{:error, Commanded.SubscriptionNotFound.new(subscription_name)}, state}
       end
 
     {:reply, reply, state}
@@ -300,7 +302,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
 
     reply =
       case Map.get(snapshots, source_uuid, nil) do
-        nil -> {:error, :snapshot_not_found}
+        nil -> {:error, Commanded.SnapshotNotFound.new(source_uuid)}
         snapshot -> {:ok, deserialize(state, snapshot)}
       end
 
@@ -434,7 +436,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
 
     case intersection do
       0 -> :ok
-      _ -> {{:error, :duplicate_event}, state}
+      _ -> {{:error, Commanded.DuplicateEvent.new()}, state}
     end
   end
 
@@ -507,6 +509,8 @@ defmodule Commanded.EventStore.Adapters.InMemory do
 
         case PersistentSubscription.publish(subscription, unseen_event) do
           {:ok, subscription} -> publish_events(state, subscription)
+          # Cannot transform to struct error - this is used internally in PersistentSubscription protocol
+          # and changing it would require updating the PersistentSubscription module interface
           {:error, :no_subscriber_available} -> subscription
         end
 
@@ -532,6 +536,8 @@ defmodule Commanded.EventStore.Adapters.InMemory do
         %PersistentSubscription{} = subscription ->
           publish_events(state, subscription)
 
+        # Cannot transform to struct error - this is used internally in PersistentSubscription protocol
+        # and changing it would require updating the PersistentSubscription module interface
         {:error, :unexpected_ack} ->
           # We tried to ack an event but there is no matching in-flight event
           # I *think* it's okay to ignore this and leave the subscription as is

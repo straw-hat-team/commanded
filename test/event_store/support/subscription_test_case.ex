@@ -215,7 +215,7 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         {:ok, _subscription} =
           event_store.subscribe_to(event_store_meta, "stream1", "subscriber", self(), :origin, [])
 
-        assert {:error, :subscription_already_exists} ==
+        assert {:error, %Commanded.SubscriptionAlreadyExists{}} =
                  event_store.subscribe_to(
                    event_store_meta,
                    "stream1",
@@ -310,7 +310,7 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         {:ok, _subscription} =
           event_store.subscribe_to(event_store_meta, :all, "subscriber", self(), :origin, [])
 
-        assert {:error, :subscription_already_exists} ==
+        assert {:error, %Commanded.SubscriptionAlreadyExists{}} =
                  event_store.subscribe_to(
                    event_store_meta,
                    :all,
@@ -347,7 +347,7 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         {:ok, subscriber2} = Subscriber.start_link(event_store, event_store_meta, self())
 
         assert_receive {:subscribed, ^subscriber1, _subscription1}
-        assert_receive {:subscribe_error, :subscription_already_exists, ^subscriber2}
+        assert_receive {:subscribe_error, %Commanded.SubscriptionAlreadyExists{}, ^subscriber2}
         refute_receive {:subscribed, _subscriber, _subscription}
       end
 
@@ -370,7 +370,7 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         assert_receive {:subscribed, ^subscriber1, _subscription1}
         assert_receive {:subscribed, ^subscriber2, _subscription1}
         assert_receive {:subscribed, ^subscriber3, _subscription1}
-        assert_receive {:subscribe_error, :too_many_subscribers, ^subscriber4}
+        assert_receive {:subscribe_error, %Commanded.TooManySubscribers{}, ^subscriber4}
         refute_receive {:subscribed, _subscriber, _subscription}
       end
 

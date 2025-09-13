@@ -43,12 +43,16 @@ defmodule Commanded.Middleware.ConsistencyGuarantee do
       :ok ->
         pipeline
 
+      # Cannot transform to struct error - this is received from Subscriptions.wait_for/4
+      # which returns :timeout as part of its internal protocol
       {:error, :timeout} ->
         Logger.warning(fn ->
           "Consistency timeout waiting for aggregate #{inspect(aggregate_uuid)} at version #{inspect(aggregate_version)}"
         end)
 
-        respond(pipeline, {:error, :consistency_timeout})
+        timeout_ms = Subscriptions.default_consistency_timeout()
+        error = Commanded.ConsistencyTimeout.new(timeout_ms: timeout_ms, consistency_level: consistency)
+        respond(pipeline, {:error, error})
     end
   end
 

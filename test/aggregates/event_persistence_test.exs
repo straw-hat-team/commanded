@@ -192,6 +192,6 @@ defmodule Commanded.Aggregates.EventPersistenceTest do
 
     assert length(recorded_events) == 1
 
-    assert {:error, :stream_not_found} == EventStore.stream_forward(DefaultApp, aggregate_uuid, 0)
+    assert {:error, %Commanded.StreamNotFound{}} = EventStore.stream_forward(DefaultApp, aggregate_uuid, 0)
   end
 end

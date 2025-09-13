@@ -43,7 +43,7 @@ defmodule Commanded.EventStore.SnapshotTestCase do
         event_store: event_store,
         event_store_meta: event_store_meta
       } do
-        {:error, :snapshot_not_found} =
+        {:error, %Commanded.SnapshotNotFound{}} =
           event_store.read_snapshot(event_store_meta, "doesnotexist")
       end
     end
@@ -61,7 +61,7 @@ defmodule Commanded.EventStore.SnapshotTestCase do
         assert snapshot_timestamps_within_delta?(snapshot, snapshot1, 60)
         assert :ok == event_store.delete_snapshot(event_store_meta, snapshot1.source_uuid)
 
-        assert {:error, :snapshot_not_found} ==
+        assert {:error, %Commanded.SnapshotNotFound{}} =
                  event_store.read_snapshot(event_store_meta, snapshot1.source_uuid)
       end
     end

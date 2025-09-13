@@ -36,7 +36,7 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
     test "should timeout waiting for strongly consistent event handler to handle event" do
       command = %ConsistencyCommand{uuid: UUID.uuid4(), delay: 5_000}
 
-      assert {:error, :consistency_timeout} =
+      assert {:error, %Commanded.ConsistencyTimeout{}} =
                ConsistencyApp.dispatch(command, consistency: :strong)
     end
 
@@ -55,7 +55,7 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
     test "should timeout waiting for strongly consistent handler dispatching a command" do
       command = %RequestDispatchCommand{uuid: UUID.uuid4(), delay: 5_000}
 
-      assert {:error, :consistency_timeout} =
+      assert {:error, %Commanded.ConsistencyTimeout{}} =
                ConsistencyApp.dispatch(command, consistency: :strong)
     end
   end
@@ -79,7 +79,7 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
         consistency: ["OptionalStronglyConsistentEventHandler"]
       ]
 
-      assert {:error, :consistency_timeout} = ConsistencyApp.dispatch(command, opts)
+      assert {:error, %Commanded.ConsistencyTimeout{}} = ConsistencyApp.dispatch(command, opts)
     end
   end
 

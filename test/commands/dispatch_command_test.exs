@@ -49,7 +49,7 @@ defmodule Commanded.Commands.DispatchCommandTest do
                  returning: :aggregate_state
                )
 
-      assert {:error, :duplicate_event} =
+      assert {:error, %Commanded.DuplicateEvent{}} =
                BankApp.dispatch(
                  %DepositMoney{
                    account_number: "ACC123",

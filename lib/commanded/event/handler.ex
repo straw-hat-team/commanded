@@ -493,13 +493,13 @@ defmodule Commanded.Event.Handler do
   @doc """
   Handle a domain event and its metadata.
 
-  Return `:ok` on success, `{:error, :already_seen_event}` to ack and skip the
+  Return `:ok` on success, `{:error, %Commanded.AlreadySeenEvent{}}` to ack and skip the
   event, or `{:error, reason}` on failure.
   """
   @callback handle(domain_event, metadata) ::
               :ok
               | {:ok, new_state :: any()}
-              | {:error, :already_seen_event}
+              | {:error, Commanded.AlreadySeenEvent.t()}
               | {:error, reason :: any()}
 
   @doc """
@@ -523,7 +523,7 @@ defmodule Commanded.Event.Handler do
 
   The `c:error/3` function allows you to control how event handling failures
   are handled. The function is passed the error returned by the event handler
-  (e.g. `{:error, :failure}`), the event causing the error, and a context map
+  (e.g. `{:error, :failure}` - note: this is an example using an atom error for simplicity), the event causing the error, and a context map
   containing state passed between retries.
 
   Use pattern matching on the error and/or failed event to explicitly handle
@@ -569,9 +569,11 @@ defmodule Commanded.Event.Handler do
 
         def handle(%AnEvent{}, _metadata) do
           # simulate event handling failure
+          # Note: Using atom error for example simplicity - consider using struct errors in production
           {:error, :failed}
         end
 
+        # Note: Pattern matching on atom error for example simplicity - consider using struct errors in production
         def error({:error, :failed}, %AnEvent{} = event, %FailureContext{context: context}) do
           context = record_failure(context)
 
@@ -1074,10 +1076,10 @@ defmodule Commanded.Event.Handler do
 
         confirm_receipt(event, %Handler{state | handler_state: handler_state})
 
-      {:error, :already_seen_event} ->
+      {:error, %Commanded.AlreadySeenEvent{}} = error ->
         telemetry_stop(
           start_time,
-          Map.put(telemetry_metadata, :error, :already_seen_event),
+          Map.put(telemetry_metadata, :error, error),
           :handle
         )
 
@@ -1115,7 +1117,12 @@ defmodule Commanded.Event.Handler do
           :handle
         )
 
-        error = {:error, :invalid_return_value}
+        %Handler{handler_module: handler_module} = state
+        error = {:error, Commanded.InvalidReturnValue.new(
+          expected: ":ok or {:error, term}",
+          actual: invalid,
+          handler_name: handler_module
+        )}
         failure_context = build_failure_context(event, context, state)
 
         next = fn context, state -> handle_event(event, context, state) end

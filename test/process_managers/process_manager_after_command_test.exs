@@ -81,7 +81,7 @@ defmodule Commanded.ProcessManagers.ProcessManagerAfterCommandTest do
                {:error, :process_manager_not_found}
 
       # Process state snapshot should be deleted
-      assert EventStore.read_snapshot(ExampleApp, source_uuid) == {:error, :snapshot_not_found}
+      assert {:error, %Commanded.SnapshotNotFound{}} = EventStore.read_snapshot(ExampleApp, source_uuid)
     end)
   end
 end

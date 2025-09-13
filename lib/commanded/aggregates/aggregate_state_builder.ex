@@ -77,6 +77,10 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
            aggregate_version + 1,
            @read_event_batch_size
          ) do
+      {:error, %Commanded.StreamNotFound{}} ->
+        # aggregate does not exist, return initial state
+        state
+
       {:error, :stream_not_found} ->
         # aggregate does not exist, return initial state
         state

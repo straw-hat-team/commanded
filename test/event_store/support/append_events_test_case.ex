@@ -81,7 +81,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
                    build_events(2)
                  )
 
-        assert {:error, :stream_exists} ==
+        assert {:error, %Commanded.StreamExists{}} =
                  event_store.append_to_stream(
                    event_store_meta,
                    "stream",
@@ -115,7 +115,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
         event_store: event_store,
         event_store_meta: event_store_meta
       } do
-        assert {:error, :stream_not_found} ==
+        assert {:error, %Commanded.StreamNotFound{}} =
                  event_store.append_to_stream(
                    event_store_meta,
                    "stream",
@@ -126,7 +126,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
 
       test "should fail to append to a stream because of wrong expected version when no stream",
            %{event_store: event_store, event_store_meta: event_store_meta} do
-        assert {:error, :wrong_expected_version} ==
+        assert {:error, %Commanded.WrongExpectedVersion{}} =
                  event_store.append_to_stream(event_store_meta, "stream", 1, build_events(1))
       end
 
@@ -136,13 +136,13 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
       } do
         assert :ok == event_store.append_to_stream(event_store_meta, "stream", 0, build_events(3))
 
-        assert {:error, :wrong_expected_version} ==
+        assert {:error, %Commanded.WrongExpectedVersion{}} =
                  event_store.append_to_stream(event_store_meta, "stream", 0, build_events(1))
 
-        assert {:error, :wrong_expected_version} ==
+        assert {:error, %Commanded.WrongExpectedVersion{}} =
                  event_store.append_to_stream(event_store_meta, "stream", 1, build_events(1))
 
-        assert {:error, :wrong_expected_version} ==
+        assert {:error, %Commanded.WrongExpectedVersion{}} =
                  event_store.append_to_stream(event_store_meta, "stream", 2, build_events(1))
 
         assert :ok == event_store.append_to_stream(event_store_meta, "stream", 3, build_events(1))
@@ -154,7 +154,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
         event_store: event_store,
         event_store_meta: event_store_meta
       } do
-        assert {:error, :stream_not_found} ==
+        assert {:error, %Commanded.StreamNotFound{}} =
                  event_store.stream_forward(event_store_meta, "unknownstream")
       end
     end

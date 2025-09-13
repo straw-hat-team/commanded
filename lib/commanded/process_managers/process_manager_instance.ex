@@ -99,6 +99,9 @@ defmodule Commanded.ProcessManagers.ProcessManagerInstance do
               last_seen_event: source_version
           }
 
+        {:error, %Commanded.SnapshotNotFound{}} ->
+          state
+
         {:error, :snapshot_not_found} ->
           state
       end

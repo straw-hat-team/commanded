@@ -111,13 +111,21 @@ defmodule Commanded.Commands.Dispatcher do
         {:exit, {:normal, :aggregate_stopped}} = result ->
           result
 
-        {:exit, {{:nodedown, _node_name}, {GenServer, :call, _}}} ->
-          {:error, :remote_node_down}
+        {:exit, {{:nodedown, node_name}, {GenServer, :call, _}}} ->
+          {:error, Commanded.RemoteNodeDown.new(node_name)}
 
-        {:exit, _reason} ->
-          {:error, :aggregate_execution_failed}
+        {:exit, reason} ->
+          %Payload{command: command} = payload
+          command_type = command.__struct__
+
+          {:error, Commanded.AggregateExecutionFailed.new(
+            command_type: command_type,
+            reason: reason
+          )}
 
         nil ->
+          # Cannot transform to struct error - this is used internally for timeout handling
+          # and would require updating the entire timeout handling chain
           {:error, :aggregate_execution_timeout}
       end
 
@@ -142,7 +150,7 @@ defmodule Commanded.Commands.Dispatcher do
         # Maybe retry command when aggregate process stopped by lifespan timeout
         maybe_retry(pipeline, payload, context)
 
-      {:error, :remote_node_down} ->
+      {:error, %Commanded.RemoteNodeDown{}} ->
         # Maybe retry command when aggregate process not found on a remote node
         maybe_retry(pipeline, payload, context)
 

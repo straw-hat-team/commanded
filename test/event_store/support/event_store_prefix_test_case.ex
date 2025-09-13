@@ -27,8 +27,11 @@ defmodule Commanded.EventStore.EventStorePrefixTestCase do
 
         assert :ok == event_store.append_to_stream(event_store_meta1, "stream", 0, events)
 
-        assert {:error, :stream_not_found} ==
-                 event_store.stream_forward(event_store_meta2, "stream")
+        # Different adapters return different error formats:
+        # InMemory adapter returns struct exceptions, EventStore adapter returns atoms
+        result = event_store.stream_forward(event_store_meta2, "stream")
+        assert match?({:error, %Commanded.StreamNotFound{}}, result) or
+               match?({:error, :stream_not_found}, result)
       end
     end
 

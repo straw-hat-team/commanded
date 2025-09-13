@@ -66,8 +66,8 @@ defmodule Commanded.Commands.RoutingCommandsTest do
     end
 
     test "should fail to dispatch unregistered command" do
-      assert {:error, :unregistered_command} =
-               CommandHandlerRouter.dispatch(%UnregisteredCommand{}, @dispatch_opts)
+    assert {:error, %Commanded.UnregisteredCommand{}} =
+             CommandHandlerRouter.dispatch(%UnregisteredCommand{}, @dispatch_opts)
     end
 
     test "should fail to dispatch command with `nil` identity" do
@@ -88,7 +88,7 @@ defmodule Commanded.Commands.RoutingCommandsTest do
     end
 
     test "should fail to dispatch unregistered command" do
-      assert {:error, :unregistered_command} =
+      assert {:error, %Commanded.UnregisteredCommand{}} =
                AggregateRouter.dispatch(%UnregisteredCommand{}, @dispatch_opts)
     end
 

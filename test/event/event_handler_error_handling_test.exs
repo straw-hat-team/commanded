@@ -126,8 +126,8 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
       %InvalidReturnValueEvent{reply_to: reply_to()}
     ])
 
-    assert_receive {:error, :invalid_return_value}
-    assert_receive {:DOWN, ^ref, :process, ^handler, :invalid_return_value}
+    assert_receive {:error, %Commanded.InvalidReturnValue{}}
+    assert_receive {:DOWN, ^ref, :process, ^handler, %Commanded.InvalidReturnValue{}}
   end
 
   test "should stop event handler on error by default", %{handler: handler, ref: ref} do

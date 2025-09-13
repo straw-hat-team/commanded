@@ -50,8 +50,8 @@ defmodule Commanded.DynamicApplicationsTest do
 
       assert Commanded.EventStore.stream_forward(:example1, account_number) |> length() == 1
 
-      assert {:error, :stream_not_found} =
-               Commanded.EventStore.stream_forward(:example2, account_number)
+    assert {:error, %Commanded.StreamNotFound{}} =
+             Commanded.EventStore.stream_forward(:example2, account_number)
 
       {:ok, ^account_number} = open_account(:example2, account_number)
 

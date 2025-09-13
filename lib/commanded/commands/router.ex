@@ -384,8 +384,8 @@ defmodule Commanded.Commands.Router do
           | {:ok, aggregate_state :: struct()}
           | {:ok, aggregate_version :: non_neg_integer()}
           | {:ok, execution_result :: ExecutionResult.t()}
-          | {:error, :unregistered_command}
-          | {:error, :consistency_timeout}
+          | {:error, Commanded.UnregisteredCommand.t()}
+          | {:error, Commanded.ConsistencyTimeout.t()}
           | {:error, reason :: term()}
 
   @doc """
@@ -617,7 +617,8 @@ defmodule Commanded.Commands.Router do
           Map.put(telemetry_metadata, :error, :unregistered_command)
         )
 
-        {:error, :unregistered_command}
+        command_type = command.__struct__
+        {:error, Commanded.UnregisteredCommand.new(command_type)}
       end
 
       # Make sure the metadata must be Map.t()

@@ -29,7 +29,7 @@ defmodule Commanded.Aggregates.SnapshottingTest do
       aggregate_uuid = UUID.uuid4()
       append_items(aggregate_uuid, 1)
 
-      assert EventStore.read_snapshot(DefaultApp, aggregate_uuid) == {:error, :snapshot_not_found}
+      assert {:error, %Commanded.SnapshotNotFound{}} = EventStore.read_snapshot(DefaultApp, aggregate_uuid)
     end
 
     test "should ignore existing snapshot" do
@@ -63,7 +63,7 @@ defmodule Commanded.Aggregates.SnapshottingTest do
       aggregate_uuid = UUID.uuid4()
       append_items(aggregate_uuid, 1)
 
-      assert EventStore.read_snapshot(DefaultApp, aggregate_uuid) == {:error, :snapshot_not_found}
+      assert {:error, %Commanded.SnapshotNotFound{}} = EventStore.read_snapshot(DefaultApp, aggregate_uuid)
     end
   end
 
@@ -78,7 +78,7 @@ defmodule Commanded.Aggregates.SnapshottingTest do
       aggregate_uuid = UUID.uuid4()
       append_items(aggregate_uuid, 9)
 
-      assert EventStore.read_snapshot(DefaultApp, aggregate_uuid) == {:error, :snapshot_not_found}
+      assert {:error, %Commanded.SnapshotNotFound{}} = EventStore.read_snapshot(DefaultApp, aggregate_uuid)
     end
 
     test "should shapshot when exactly snapshot interval" do

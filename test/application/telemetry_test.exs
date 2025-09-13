@@ -61,15 +61,14 @@ defmodule Commanded.Application.TelemetryTest do
 
   test "emit `[:commanded, :application, :dispatch, :start | :stop]` event on unregistered command" do
     command = %Fail{aggregate_uuid: UUID.uuid4()}
-    error = :unregistered_command
 
-    assert {:error, ^error} = TestRouter.dispatch(command, application: DefaultApp)
+    assert {:error, %Commanded.UnregisteredCommand{}} = TestRouter.dispatch(command, application: DefaultApp)
 
     assert_receive {[:commanded, :application, :dispatch, :start], 1, _meas, _meta}
 
     assert_receive {[:commanded, :application, :dispatch, :stop], 2, _meas, meta}
 
-    assert %{application: DefaultApp, error: ^error, execution_context: %{command: ^command}} =
+    assert %{application: DefaultApp, error: :unregistered_command, execution_context: %{command: ^command}} =
              meta
   end
 

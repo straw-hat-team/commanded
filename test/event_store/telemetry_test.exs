@@ -46,7 +46,7 @@ defmodule Commanded.EventStore.TelemetryTest do
 
     test "emit `[:commanded, :event_store, :read_snapshot, :start | :stop]` event" do
       uuid = UUID.uuid4()
-      assert {:error, :snapshot_not_found} = EventStore.read_snapshot(DefaultApp, uuid)
+      assert {:error, %Commanded.SnapshotNotFound{}} = EventStore.read_snapshot(DefaultApp, uuid)
 
       assert_receive {[:commanded, :event_store, :read_snapshot, :start], 1, _meas, _meta}
       assert_receive {[:commanded, :event_store, :read_snapshot, :stop], 2, _meas, meta}
@@ -66,7 +66,7 @@ defmodule Commanded.EventStore.TelemetryTest do
   describe "streaming telemetry events" do
     test "emit `[:commanded, :event_store, :stream_forward, :start | :stop]` event" do
       uuid = UUID.uuid4()
-      assert {:error, :stream_not_found} = EventStore.stream_forward(DefaultApp, uuid)
+      assert {:error, %Commanded.StreamNotFound{}} = EventStore.stream_forward(DefaultApp, uuid)
 
       assert_receive {[:commanded, :event_store, :stream_forward, :start], 1, _meas, _meta}
       assert_receive {[:commanded, :event_store, :stream_forward, :stop], 2, _meas, meta}
@@ -146,8 +146,8 @@ defmodule Commanded.EventStore.TelemetryTest do
     end
 
     test "emit `[:commanded, :event_store, :delete_subscription, :start | :stop]` event" do
-      assert {:error, :subscription_not_found} =
-               EventStore.delete_subscription(DefaultApp, :all, "Test")
+    assert {:error, %Commanded.SubscriptionNotFound{}} =
+             EventStore.delete_subscription(DefaultApp, :all, "Test")
 
       assert_receive {[:commanded, :event_store, :delete_subscription, :start], 1, _meas, _meta}
       assert_receive {[:commanded, :event_store, :delete_subscription, :stop], 2, _meas, meta}
