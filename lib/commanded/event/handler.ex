@@ -338,6 +338,17 @@ defmodule Commanded.Event.Handler do
   have processed all events produced by the command: if event handling fails
   the events will have still been persisted.
 
+  ### Example
+
+  Define an event handler with `:strong` consistency:
+
+      defmodule ExampleHandler do
+        use Commanded.Event.Handler,
+          application: ExampleApp,
+          name: "ExampleHandler",
+          consistency: :strong
+      end
+
   ## Batching
 
   Sometimes, it is more efficient to process a whole batch of events, write them
@@ -356,17 +367,6 @@ defmodule Commanded.Event.Handler do
 
   Batching and concurrency currently are not supported together; setting conflicting
   options will trigger a compilation error.
-
-  ### Example
-
-  Define an event handler with `:strong` consistency:
-
-      defmodule ExampleHandler do
-        use Commanded.Event.Handler,
-          application: ExampleApp,
-          name: "ExampleHandler",
-          consistency: :strong
-      end
 
   ## Dynamic application
 
