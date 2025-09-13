@@ -524,9 +524,9 @@ defmodule Commanded.Commands.Router do
 
           application = Keyword.fetch!(opts, :application)
           causation_id = Keyword.get(opts, :causation_id)
-          command_uuid = Keyword.get_lazy(opts, :command_uuid, &UUID.uuid4/0)
+          command_uuid = Keyword.get_lazy(opts, :command_uuid, &UUID.uuid7/0)
           consistency = Keyword.fetch!(opts, :consistency)
-          correlation_id = Keyword.get_lazy(opts, :correlation_id, &UUID.uuid4/0)
+          correlation_id = Keyword.get_lazy(opts, :correlation_id, &UUID.uuid7/0)
           metadata = Keyword.fetch!(opts, :metadata) |> validate_metadata()
 
           retry_attempts = Keyword.get(opts, :retry_attempts)

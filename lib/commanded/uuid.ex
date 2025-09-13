@@ -16,4 +16,9 @@ defmodule Commanded.UUID do
   Generates a UUID using the configured provider (defaults to `Uniq.UUID`).
   """
   defdelegate uuid4, to: @uuid_mod
+
+  @doc """
+  Generates a UUIDv7 using the configured provider (defaults to `Uniq.UUID`).
+  """
+  defdelegate uuid7, to: @uuid_mod
 end
