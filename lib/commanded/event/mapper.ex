@@ -37,8 +37,8 @@ defmodule Commanded.Event.Mapper do
             %ExampleEvent1{},
             %ExampleEvent2{}
           ],
-          causation_id: Commanded.UUID.uuid4(),
-          correlation_id: Commanded.UUID.uuid4(),
+          causation_id: Commanded.UUID.uuid7(),
+          correlation_id: Commanded.UUID.uuid7(),
           metadata: %{"user_id" => user_id}
         )
 

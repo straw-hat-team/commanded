@@ -452,7 +452,7 @@ defmodule Commanded.EventStore.Adapters.InMemory do
     } = event
 
     %RecordedEvent{
-      event_id: event_id || UUID.uuid4(),
+      event_id: event_id || UUID.uuid7(),
       event_number: event_number,
       stream_id: stream_uuid,
       stream_version: stream_version,
