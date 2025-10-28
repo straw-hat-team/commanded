@@ -115,7 +115,7 @@ defmodule Commanded.Application do
   own separately configured and isolated event store. Each application must be
   started with a unique name.
 
-  Multiple instances of the same event handler or process manager can be
+  Multiple instances of the same event handler can be
   started by referring to a started application by its name. The event store
   operations can also be scoped to an application by referring to its name.
 
@@ -320,9 +320,9 @@ defmodule Commanded.Application do
           - `:eventual` (default) - a successful command dispatch will return immediately.
 
           - `:strong` - a successful command dispatch will block until all strongly
-            consistent event handlers and process managers have handled all events created by the command.
+            consistent event handlers have handled all events created by the command.
 
-          - An explicit list of event handler and process manager modules (or their configured names),
+          - An explicit list of event handler modules (or their configured names),
             containing only those handlers you'd like to wait for. No other handlers will be awaited on,
             regardless of their own configured consistency setting.
             e.g. `[ExampleHandler, AnotherHandler]` or `["ExampleHandler", "AnotherHandler"]`

@@ -256,7 +256,7 @@ use Mix.Config
 config :my_app, consistency: :strong
 ```
 
-Then read the setting when defining your event handlers and process managers:
+Then read the setting when defining your event handlers:
 
 ```elixir
 defmodule ExampleEventHandler do

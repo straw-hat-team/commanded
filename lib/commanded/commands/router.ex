@@ -113,7 +113,7 @@ defmodule Commanded.Commands.Router do
           :ok = BankApp.dispatch(command, consistency: :eventual)
 
     - `:strong` - block command dispatch until all strongly
-      consistent event handlers and process managers have successfully processed
+      consistent event handlers have successfully processed
       all events created by the command.
 
       Use this when you have event handlers that update read models you need to
@@ -121,7 +121,7 @@ defmodule Commanded.Commands.Router do
 
           :ok = BankApp.dispatch(command, consistency: :strong)
 
-    - Provide an explicit list of event handler and process manager modules (or
+    - Provide an explicit list of event handler modules (or
       their configured names), containing only those handlers you'd like to wait
       for. No other handlers will be awaited on, regardless of their own
       configured consistency setting.

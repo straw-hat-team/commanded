@@ -2,7 +2,7 @@
 
 ## Overview
 
-Commanded v2.0 introduces breaking changes to improve type safety and API clarity. The primary change is that metadata passed to event handlers and process managers has been changed from a plain map to the `Commanded.EventStore.EnrichedMetadata` struct.
+Commanded v2.0 introduces breaking changes to improve type safety and API clarity. The primary change is that metadata passed to event handlers has been changed from a plain map to the `Commanded.EventStore.EnrichedMetadata` struct.
 
 The issues come when you need to propagate the used-provided metadata, and you need to drop some keys, example:
 
@@ -80,16 +80,7 @@ end
    end
    ```
 
-2. **Update your process manager callbacks:**
-
-   - `interested?/2`
-   - `handle/3`
-   - `apply/3`
-   - `after_command/3`
-
-   All now receive `%EnrichedMetadata{}` instead of a plain map.
-
-3. **Update pattern matching:**
+2. **Update pattern matching:**
 
    ```elixir
    # Before
