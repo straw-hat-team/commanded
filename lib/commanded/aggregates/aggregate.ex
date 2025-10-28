@@ -119,7 +119,6 @@ defmodule Commanded.Aggregates.Aggregate do
   alias Commanded.Aggregates.ExecutionContext
   alias Commanded.Application.Config
   alias Commanded.Event.Mapper
-  alias Commanded.Event.Upcast
   alias Commanded.EventStore
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.Registration
@@ -392,15 +391,12 @@ defmodule Commanded.Aggregates.Aggregate do
   @doc false
   @impl GenServer
   def handle_info({:events, events}, %Aggregate{} = state) do
-    %Aggregate{application: application} = state
-
     Logger.debug(describe(state) <> " received events: " <> inspect(events))
 
     try do
       state =
         events
         |> Enum.reject(&event_already_seen?(&1, state))
-        |> Upcast.upcast_event_stream(additional_metadata: %{application: application})
         |> Enum.reduce(state, &handle_event/2)
 
       noreply_with_lifespan(state)

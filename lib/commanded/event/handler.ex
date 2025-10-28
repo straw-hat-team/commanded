@@ -407,7 +407,6 @@ defmodule Commanded.Event.Handler do
   alias Commanded.Event.ErrorHandler
   alias Commanded.Event.FailureContext
   alias Commanded.Event.Handler
-  alias Commanded.Event.Upcast
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.EventStore.Subscription
   alias Commanded.Subscriptions
@@ -952,7 +951,7 @@ defmodule Commanded.Event.Handler do
   @doc false
   @impl GenServer
   def handle_info({:events, events}, state) do
-    %Handler{application: application, handler_callback: callback} = state
+    %Handler{handler_callback: callback} = state
 
     processor =
       case callback do
@@ -963,10 +962,7 @@ defmodule Commanded.Event.Handler do
     Logger.debug(describe(state) <> " received events: #{inspect(events)}")
 
     try do
-      state =
-        events
-        |> Upcast.upcast_event_stream(additional_metadata: %{application: application})
-        |> processor.(state)
+      state = processor.(events, state)
 
       {:noreply, state}
     catch
@@ -1417,8 +1413,7 @@ defmodule Commanded.Event.Handler do
          handler_name,
          handler_module
        ) do
-    %RecordedEvent{data: data} =
-      event = Upcast.upcast_event(event, additional_metadata: %{application: application})
+    %RecordedEvent{data: data} = event
 
     metadata =
       RecordedEvent.enrich_metadata(event,

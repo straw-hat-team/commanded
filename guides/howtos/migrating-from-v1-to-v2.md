@@ -94,18 +94,6 @@ end
    end
    ```
 
-4. **Update Upcaster implementations:**
-
-   ```elixir
-   defimpl Commanded.Event.Upcaster, for: MyEvent do
-     alias Commanded.EventStore.EnrichedMetadata
-
-     def upcast(event, %EnrichedMetadata{} = metadata) do
-       # Implementation
-     end
-   end
-   ```
-
 ## System Metadata Fields
 
 The following fields are now directly accessible on the `EnrichedMetadata` struct:

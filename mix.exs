@@ -131,7 +131,6 @@ defmodule Commanded.Mixfile do
           Commanded.Event.FailureContext,
           Commanded.Event.Handler,
           Commanded.Event.Mapper,
-          Commanded.Event.Upcaster,
           Commanded.Event.EventId
         ],
         "Event Store": [
