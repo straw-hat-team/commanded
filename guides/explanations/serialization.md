@@ -2,7 +2,7 @@
 
 ## Default JSON serializer
 
-JSON serialization can be used for event data & metadata, and aggregate and process manager snapshots.
+JSON serialization can be used for event data & metadata, and aggregate snapshots.
 
 To enable JSON serialization with the included `Commanded.Serialization.JsonSerializer` module add the `jason` library to your deps:
 

@@ -7,8 +7,7 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
     EventuallyConsistentEventHandler,
     ExecutionResult,
     OptionalStronglyConsistentEventHandler,
-    StronglyConsistentEventHandler,
-    StronglyConsistentProcessManager
+    StronglyConsistentEventHandler
   }
 
   alias Commanded.Commands.ConsistencyApp
@@ -117,16 +116,6 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
     end
   end
 
-  describe "process manager consistency" do
-    setup :start_process_manager
-
-    test "should successfully dispatch command" do
-      command = %RequestDispatchCommand{uuid: UUID.uuid4(), delay: 5_000}
-
-      assert :ok = ConsistencyApp.dispatch(command, consistency: :strong)
-    end
-  end
-
   def start_event_handlers(_context) do
     start_supervised!(StronglyConsistentEventHandler, shutdown: :brutal_kill)
     start_supervised!(EventuallyConsistentEventHandler, shutdown: :brutal_kill)
@@ -136,12 +125,6 @@ defmodule Commanded.Commands.DispatchConsistencyTest do
 
   def start_optional_handler(_context) do
     start_supervised!(OptionalStronglyConsistentEventHandler)
-
-    :ok
-  end
-
-  def start_process_manager(_context) do
-    start_supervised!(StronglyConsistentProcessManager)
 
     :ok
   end

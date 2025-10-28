@@ -5,7 +5,6 @@ defmodule Commanded.Subscriptions.DistributedSubscribers do
   alias Commanded.Subscriptions
 
   @event_handlers [EventHandler1, EventHandler2, EventHandler3]
-  @process_managers [ProcessManager1, ProcessManager2, ProcessManager3]
 
   for event_handler <- @event_handlers do
     defmodule event_handler do
@@ -16,16 +15,7 @@ defmodule Commanded.Subscriptions.DistributedSubscribers do
     end
   end
 
-  for process_manager <- @process_managers do
-    defmodule process_manager do
-      use Commanded.ProcessManagers.ProcessManager,
-        application: DistributedApp,
-        name: __MODULE__,
-        consistency: :strong
-    end
-  end
-
-  def all, do: @event_handlers ++ @process_managers
+  def all, do: @event_handlers
 
   def start_subscribers(nodes) do
     reply_to = self()

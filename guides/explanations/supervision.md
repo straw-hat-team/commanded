@@ -1,6 +1,6 @@
 # Supervision
 
-Use an OTP supervisor to host your Commanded application, process managers, event handlers, and read model projectors.
+Use an OTP supervisor to host your Commanded application, event handlers, and read model projectors.
 
 ```elixir
 defmodule Bank.Supervisor do
@@ -18,9 +18,6 @@ defmodule Bank.Supervisor do
 
       # Event handler
       AccountBalanceHandler,
-
-      # Process manager
-      TransferMoneyProcessManager,
 
       # Read model projector
       AccountsProjector,

@@ -243,7 +243,7 @@ In Commanded, the available options during command dispatch are:
   :ok = BankApp.dispatch(command, consistency: :eventual)
   ```
 
-- `:strong` - block command dispatch until all strongly consistent event handlers and process managers have successfully processed all events created by the command.
+- `:strong` - block command dispatch until all strongly consistent event handlers have successfully processed all events created by the command.
 
   ```elixir
   :ok = BankApp.dispatch(command, consistency: :strong)
@@ -251,7 +251,7 @@ In Commanded, the available options during command dispatch are:
 
   Dispatching a command using `:strong` consistency but without any strongly consistent event handlers configured will have no effect.
 
-- Provide an explicit list of event handler and process manager modules (or their configured names), containing only those handlers you'd like to wait for. No other handlers will be awaited on, regardless of their own configured consistency setting.
+- Provide an explicit list of event handler modules (or their configured names), containing only those handlers you'd like to wait for. No other handlers will be awaited on, regardless of their own configured consistency setting.
 
   ```elixir
   :ok = BankApp.dispatch(command, consistency: [ExampleHandler, AnotherHandler])
@@ -262,11 +262,11 @@ In Commanded, the available options during command dispatch are:
 
 #### Which consistency guarantee should I use?
 
-When dispatching a command using `consistency: :strong` the dispatch will block until all of the strongly consistent event handlers and process managers have handled all events created by the command. This guarantees that when you receive the `:ok` response from dispatch, your strongly consistent read models will have been updated and can safely be queried.
+When dispatching a command using `consistency: :strong` the dispatch will block until all of the strongly consistent event handlers have handled all events created by the command. This guarantees that when you receive the `:ok` response from dispatch, your strongly consistent read models will have been updated and can safely be queried.
 
 Strong consistency helps to alleviate problems and workarounds you would otherwise encounter when dealing with eventual consistency in your own application. Use `:strong` consistency when you want to query a read model immediately after dispatching a command. You **must** also configure the event handler to use `:strong` consistency.
 
-Using `:eventual` consistency, or omitting the `consistency` option, will cause the command dispatch to immediately return without waiting for any event handlers or process managers. The handlers run independently, and asynchronously, in the background, therefore you will need to deal with potentially stale read model data.
+Using `:eventual` consistency, or omitting the `consistency` option, will cause the command dispatch to immediately return without waiting for any event handlers. The handlers run independently, and asynchronously, in the background, therefore you will need to deal with potentially stale read model data.
 
 #### Configure default consistency
 
@@ -276,7 +276,7 @@ You may override the default consistency (`:eventual`) by setting `default_consi
 config :commanded, default_consistency: :strong
 ```
 
-This will effect command dispatch, event handlers, and process managers where a consistency is not explicitly defined.
+This will effect command dispatch and event handlers where a consistency is not explicitly defined.
 
 #### Consistency failures
 
@@ -410,8 +410,6 @@ defmodule ExampleHandler do
   end
 end
 ```
-
-Commands dispatched by a process manager will be automatically assigned the appropriate causation and correlation ids from the source domain event.
 
 You can use [Commanded audit middleware](https://hex.pm/packages/commanded_audit_middleware) to record every dispatched command. This allows you to follow the chain of commands and events by using the causation id. The correlation id can be used to find all related commands and events.
 

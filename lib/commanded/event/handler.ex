@@ -131,7 +131,7 @@ defmodule Commanded.Event.Handler do
   ## Event handler name
 
   The name you specify is used when subscribing to the event store. You must use
-  a unique name for each event handler and process manager you start. Also, you
+  a unique name for each event handler you start. Also, you
   *should not* change the name once the handler has been deployed. A new
   subscription will be created if you change the name and the event handler will
   receive already handled events.

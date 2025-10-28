@@ -227,7 +227,7 @@ An event handler is a `GenServer` process that subscribes to the configured even
 
 Commanded supports upcasting of events at runtime using the `Commanded.Event.Upcaster` protocol.
 
-By implementing the upcaster protocol you can transform an event before it is used by a consumer. This might be an aggregate, an event handler, or a process manager. Because the upcaster changes the event at runtime, handlers only need to support the latest version. You can also use upcasting to change the type of event.
+By implementing the upcaster protocol you can transform an event before it is used by a consumer. This might be an aggregate or an event handler. Because the upcaster changes the event at runtime, handlers only need to support the latest version. You can also use upcasting to change the type of event.
 
 ### Examples
 

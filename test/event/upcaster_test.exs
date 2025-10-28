@@ -4,7 +4,7 @@ defmodule Event.UpcasterTest do
   alias Commanded.Aggregates.Aggregate
   alias Commanded.{DefaultApp, EventStore}
   alias Commanded.EventStore.{EventData, RecordedEvent}
-  alias Commanded.Event.Upcast.Events.{EventFive, EventFour, EventOne, EventThree, EventTwo, Stop}
+  alias Commanded.Event.Upcast.Events.{EventFive, EventFour, EventOne, EventThree, EventTwo}
   alias Commanded.Event.Upcast.UpcastAggregate
   alias Commanded.UUID
 
@@ -136,36 +136,6 @@ defmodule Event.UpcasterTest do
       assert_metadata(metadata4)
       assert_metadata(metadata5)
       assert_metadata(event_metadata)
-    end
-  end
-
-  describe "upcast events received by process manager" do
-    alias Commanded.Event.Upcast.ProcessManager
-    alias Commanded.Event.Upcast.ProcessManager.Application
-
-    setup do
-      start_supervised!(Application)
-      start_supervised!(ProcessManager)
-
-      :ok
-    end
-
-    test "will receive upcasted events" do
-      process_id = UUID.uuid4()
-      reply_to = :erlang.pid_to_list(self())
-
-      write_events(Application, [
-        struct(EventOne, version: 1, reply_to: reply_to, process_id: process_id),
-        struct(EventTwo, version: 1, reply_to: reply_to, process_id: process_id),
-        struct(EventThree, version: 1, reply_to: reply_to, process_id: process_id),
-        struct(Stop, process_id: process_id)
-      ])
-
-      refute_receive %EventThree{}
-
-      assert_receive %EventOne{version: 1}
-      assert_receive %EventTwo{version: 2}
-      assert_receive %EventFour{version: 2, name: "Chris"}
     end
   end
 

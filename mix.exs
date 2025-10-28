@@ -54,7 +54,6 @@ defmodule Commanded.Mixfile do
       "test/example_domain",
       "test/middleware/support",
       "test/helpers",
-      "test/process_managers/support",
       "test/pubsub/support",
       "test/registration/support",
       "test/subscriptions/support",
@@ -135,10 +134,6 @@ defmodule Commanded.Mixfile do
           Commanded.Event.Upcaster,
           Commanded.Event.EventId
         ],
-        "Process Managers": [
-          Commanded.ProcessManagers.FailureContext,
-          Commanded.ProcessManagers.ProcessManager
-        ],
         "Event Store": [
           Commanded.EventStore,
           Commanded.EventStore.Adapter,
@@ -185,7 +180,6 @@ defmodule Commanded.Mixfile do
         Commanded.Aggregates,
         Commanded.Commands,
         Commanded.Event,
-        Commanded.ProcessManagers,
         Commanded.EventStore,
         Commanded.PubSub,
         Commanded.Registration,

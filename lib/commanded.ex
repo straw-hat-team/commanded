@@ -8,7 +8,6 @@ defmodule Commanded do
   - [Command registration and dispatch](commands.html).
   - [Hosting and delegation to aggregates](aggregates.html).
   - [Event handling](events.html).
-  - [Long running process managers](process-managers.html).
 
   Use Commanded with one of the following event stores for persistence:
 
