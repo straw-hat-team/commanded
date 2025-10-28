@@ -25,7 +25,6 @@ defmodule Commanded.EventStore do
 
   """
   alias Commanded.Application
-  alias Commanded.Event.Upcast
 
   @type application :: Application.t()
   @type config :: Keyword.t()
@@ -80,7 +79,7 @@ defmodule Commanded.EventStore do
           error
 
         stream ->
-          Upcast.upcast_event_stream(stream, additional_metadata: %{application: application})
+          stream
       end
     end)
   end

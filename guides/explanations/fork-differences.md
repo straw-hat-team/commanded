@@ -11,9 +11,9 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-## Breaking Changes
+## Breaking Changes ❌
 
-### **Removed ProcessManager Support** ❌
+### **Removed ProcessManager Support**
 [PR #24](https://github.com/straw-hat-team/commanded/pull/24)
 
 **Changes:**
@@ -26,7 +26,19 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-### **EnrichedMetadata Struct** 🔄
+### **Removed Upcasting Support**
+[PR #26](https://github.com/straw-hat-team/commanded/pull/26)
+
+**Changes:**
+- Removed `Commanded.Event.Upcast` and `Commanded.Event.Upcaster` modules
+- Removed upcasting from event handlers and aggregates
+- Removed upcasting documentation
+
+**Reason:** Event schema transformations can be handled explicitly in event handlers and aggregates using pattern matching, eliminating the need for a global upcasting component.
+
+---
+
+### **EnrichedMetadata Struct**
 [PR #11](https://github.com/straw-hat-team/commanded/pull/11)
 
 **Changes:**
@@ -37,9 +49,9 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-## Features Added
+## Features Added ✨
 
-### **UUIDv7 Support** ✨
+### **UUIDv7 Support**
 [PR #22](https://github.com/straw-hat-team/commanded/pull/22)
 
 **Changes:**
@@ -48,7 +60,7 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-### **Configurable UUID Provider** ✨
+### **Configurable UUID Provider**
 
 **Changes:**
 - Integrated `Uniq.UUID` library for UUID generation
@@ -57,7 +69,7 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-### **Aggregate Telemetry for Version Conflicts** ✨
+### **Aggregate Telemetry for Version Conflicts**
 [PR #8](https://github.com/straw-hat-team/commanded/pull/8)
 
 **Changes:**
@@ -66,7 +78,7 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-### **Custom Event ID Support** ✨
+### **Custom Event ID Support**
 [PR #2](https://github.com/straw-hat-team/commanded/pull/2)
 
 **Changes:**
@@ -76,7 +88,7 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ---
 
-### **EventStore Adapter** ✨
+### **EventStore Adapter**
 [PR #1](https://github.com/straw-hat-team/commanded/pull/1)
 
 **Changes:**
