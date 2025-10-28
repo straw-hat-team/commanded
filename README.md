@@ -32,3 +32,6 @@ the Explanations, API Reference, How-To's and Tutorials guides.
 `Commanded` is based on [github.com/commanded/commanded](https://github.com/commanded/commanded).
 This fork introduces new features with an independent release cycle, allowing
 for thorough testing before contributing back to the original project.
+
+**See [Fork Differences](guides/explanations/fork-differences.md) for a complete
+list of changes and new features compared to the upstream repository.**
