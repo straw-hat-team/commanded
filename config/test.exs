@@ -38,3 +38,13 @@ config :commanded, TestEventStore,
   hostname: "localhost",
   pool_size: 5,
   pool_overflow: 0
+
+config :commanded,
+  ecto_repos: [Commanded.Projections.Repo]
+
+config :commanded, Commanded.Projections.Repo,
+  database: "commanded_projections_test",
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  pool: Ecto.Adapters.SQL.Sandbox
