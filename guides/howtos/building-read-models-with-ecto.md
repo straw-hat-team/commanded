@@ -81,6 +81,61 @@ Supervisor.start_link([
 ], strategy: :one_for_one)
 ```
 
+### Subscription options
+
+You can control how events are consumed from the event store using the `:subscription_opts` option. This provides a convenient way to group subscription-related configuration together:
+
+```elixir
+defmodule MyApp.ExampleProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp.Application,
+    repo: MyApp.Projections.Repo,
+    name: "example_projection",
+    subscription_opts: [
+      start_from: :origin,      # Start from the first event
+      subscribe_to: :all,       # Subscribe to all streams
+      concurrency: 4            # Process with 4 workers
+    ]
+
+  project %AnEvent{}, _metadata, fn multi ->
+    # Your projection logic
+  end
+end
+```
+
+#### Available subscription options
+
+- **`:start_from`** - Where to begin reading events
+  - `:origin` - Start from the very first event (use for new projections)
+  - `:current` - Start from the current position (skip historical events)
+  - Positive integer - Start from a specific event number
+
+- **`:subscribe_to`** - Which event stream(s) to subscribe to
+  - `:all` - Subscribe to all events (default)
+  - Stream name (string) - Subscribe to a specific stream
+
+- **`:concurrency`** - Number of concurrent workers for parallel processing
+  - Positive integer - Enable concurrent event processing
+  - **Note:** Mutually exclusive with `:batch_size`
+
+#### Alternative: Top-level options
+
+You can also pass these options at the top level instead of nesting them under `:subscription_opts`. Both formats are equivalent:
+
+```elixir
+defmodule MyApp.ExampleProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp.Application,
+    repo: MyApp.Projections.Repo,
+    name: "example_projection",
+    start_from: :origin,
+    subscribe_to: :all,
+    concurrency: 4
+end
+```
+
+If you provide both nested and top-level options, the top-level ones take precedence.
+
 ### Using the `project` macro
 
 The `project/3` macro expects the domain event, metadata, and a single-arity function that takes and returns an `Ecto.Multi` data structure for grouping multiple Repo operations. These will all be executed within a single transaction. You can use `Ecto.Multi` to insert, update, and delete data.
@@ -113,6 +168,35 @@ project %ItemUpdated{uuid: uuid} = event, _metadata, fn multi ->
     nil -> multi
     item -> Ecto.Multi.update(multi, :item, update_changeset(event, item))
   end
+end
+```
+
+### Using the `project_batch` macro
+
+You can use `project_batch` to receive events in batches. To enable batching, you need to set the `batch_size` and use the `project_batch/1` macro. `project_batch/1` receives a function that takes a list of `{event, metadata}` tuples for all the events in the batch and an `Ecto.Multi` structure, similar to `project/3`.
+
+Note that there is currently no built in way to target a single type of event to be projected, and as such a single `project_batch` macro is expected to gracefully handle (or ignore) any events that it may receive.
+
+#### Example
+
+```elixir
+defmodule MyApp.Projections.BatchProjector do
+  use Commanded.Projections.Ecto,
+      application: MyApp.Application,
+      repo: MyApp.Projections.Repo,
+      name: "example_batch_projection",
+      batch_size: 10
+
+    project_batch fn events, multi ->
+      projections = events
+      |> Enum.map(fn
+        {%AnEvent{name: name}, _metadata} -> %{name: name}
+        _ -> nil
+      end)
+      |> Enum.reject(&is_nil/1)
+
+      Ecto.Multi.insert_all(multi, :example_batch_projection, Projection, projections)
+    end
 end
 ```
 
@@ -217,6 +301,50 @@ end
 
 You could use this function to notify subscribers that the read model has been updated (e.g. pub/sub to Phoenix channels).
 
+#### ⚠️ Transaction Semantics
+
+**CRITICAL:** The `after_update/3` callback executes **AFTER** the database transaction has been committed. This means:
+
+- **Errors cannot rollback the transaction** - If this callback returns an error or raises an exception, the projection data is already persisted in the database.
+- **Use for side effects only** - This callback is designed for notifications, pub/sub, external API calls, or other side effects that should happen after successful projection updates.
+- **Error handling implications** - Returning `{:error, reason}` or raising an exception will propagate the error up, but the database changes are permanent. The event handler may retry, potentially causing duplicate side effects.
+
+If you need to perform validation or operations that should prevent the projection from being saved, do so within your `project/2` function (inside the `Ecto.Multi`), not in this callback.
+
+### `after_update_batch/2` callback
+
+Similarly for batching projectors, you can define an `after_update_batch/2` callback function in a projector to be called after a batch of events has been projected. The function receives a list of `{event, metadata}` tuples for each processed event and all changes from the `Ecto.Multi` struct.
+
+```elixir
+defmodule MyApp.BatchProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp.Application,
+    repo: MyApp.Projections.Repo,
+    name: "MyApp.BatchProjector",
+    batch_size: 10
+
+  project_batch fn events, multi ->
+    # Your batch projection logic
+  end
+
+  @impl Commanded.Projections.Ecto
+  def after_update_batch(events, changes) do
+    # Notify subscribers about the batch update
+    :ok
+  end
+end
+```
+
+#### ⚠️ Transaction Semantics
+
+**CRITICAL:** The `after_update_batch/2` callback executes **AFTER** the database transaction has been committed. This means:
+
+- **Errors cannot rollback the transaction** - If this callback returns an error or raises an exception, the projection data is already persisted in the database.
+- **Use for side effects only** - This callback is designed for notifications, pub/sub, external API calls, or other side effects that should happen after successful projection updates.
+- **Error handling implications** - Returning `{:error, reason}` or raising an exception will propagate the error up, but the database changes are permanent. The event handler may retry, potentially causing duplicate side effects.
+
+If you need to perform validation or operations that should prevent the projection from being saved, do so within your `project_batch/2` function (inside the `Ecto.Multi`), not in this callback.
+
 ## Schema prefix
 
 When using a prefix for your Ecto schemas you might also want to change the prefix for the `ProjectionVersion` schema. There are a number of options to do this:
@@ -225,7 +353,8 @@ When using a prefix for your Ecto schemas you might also want to change the pref
 
     ```elixir
     # config/config.exs
-    config :commanded_ecto_projections, schema_prefix: "example_schema_prefix"
+    config :commanded, Commanded.Projections.Ecto,
+      schema_prefix: "example_schema_prefix"
     ```
 
 2. Provide a static `schema_prefix` as a projector option:

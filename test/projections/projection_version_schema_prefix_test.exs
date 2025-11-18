@@ -219,6 +219,119 @@ defmodule Commanded.Projections.ProjectionVersionSchemaPrefixTest do
     end
   end
 
+  describe "schema_prefix/1 callback (1-arity)" do
+    test "should return static schema prefix value for 1-arity callback" do
+      defmodule StaticPrefixOneArityProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "static_prefix_one_arity_projector",
+          schema_prefix: "my_static_prefix",
+          repo: Commanded.Projections.Repo
+      end
+
+      event = %SchemaEvent{schema: "test"}
+
+      # Test 1-arity callback directly
+      assert StaticPrefixOneArityProjector.schema_prefix(event) == "my_static_prefix"
+
+      # Test 2-arity callback for consistency
+      assert StaticPrefixOneArityProjector.schema_prefix(event, %{}) == "my_static_prefix"
+    end
+
+    test "should invoke 1-arity function for 1-arity callback" do
+      defmodule OneArityFunctionPrefixProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "one_arity_function_prefix_projector",
+          schema_prefix: fn %SchemaEvent{schema: schema} -> "dynamic_#{schema}" end,
+          repo: Commanded.Projections.Repo
+      end
+
+      event = %SchemaEvent{schema: "tenant123"}
+
+      # Test 1-arity callback directly
+      assert OneArityFunctionPrefixProjector.schema_prefix(event) == "dynamic_tenant123"
+
+      # Test 2-arity callback for consistency
+      assert OneArityFunctionPrefixProjector.schema_prefix(event, %{}) == "dynamic_tenant123"
+    end
+
+    test "should return nil for 1-arity callback when schema_prefix is 2-arity function" do
+      defmodule TwoArityFunctionPrefixProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "two_arity_function_prefix_projector",
+          schema_prefix: fn _event, %{tenant: tenant} -> tenant end,
+          repo: Commanded.Projections.Repo
+      end
+
+      event = %SchemaEvent{schema: "test"}
+
+      # 1-arity should return nil (can't invoke 2-arity function)
+      assert TwoArityFunctionPrefixProjector.schema_prefix(event) == nil
+
+      # 2-arity should invoke the function
+      assert TwoArityFunctionPrefixProjector.schema_prefix(event, %{tenant: "tenant456"}) ==
+               "tenant456"
+    end
+
+    test "should return nil for 1-arity callback when no schema_prefix configured" do
+      defmodule NoPrefixOneArityProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "no_prefix_one_arity_projector",
+          repo: Commanded.Projections.Repo
+      end
+
+      event = %SchemaEvent{schema: "test"}
+
+      # Both should return nil
+      assert NoPrefixOneArityProjector.schema_prefix(event) == nil
+      assert NoPrefixOneArityProjector.schema_prefix(event, %{}) == nil
+    end
+
+    test "1-arity callback with 1-arity function should handle different events" do
+      defmodule PerEventOneArityProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "per_event_one_arity_projector",
+          schema_prefix: fn %SchemaEvent{schema: schema} -> "prefix_#{schema}" end,
+          repo: Commanded.Projections.Repo
+      end
+
+      # Test that 1-arity callback returns correct value for different events
+      assert PerEventOneArityProjector.schema_prefix(%SchemaEvent{schema: "tenant1"}) ==
+               "prefix_tenant1"
+
+      assert PerEventOneArityProjector.schema_prefix(%SchemaEvent{schema: "tenant2"}) ==
+               "prefix_tenant2"
+
+      assert PerEventOneArityProjector.schema_prefix(%SchemaEvent{schema: "tenant3"}) ==
+               "prefix_tenant3"
+    end
+
+    test "1-arity callback should work with app config schema prefix" do
+      Application.put_env(:commanded, Commanded.Projections.Ecto,
+        schema_prefix: "app_config_prefix"
+      )
+
+      defmodule AppConfigOneArityProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "app_config_one_arity_projector",
+          repo: Commanded.Projections.Repo
+      end
+
+      event = %SchemaEvent{schema: "test"}
+
+      # Test 1-arity callback directly
+      assert AppConfigOneArityProjector.schema_prefix(event) == "app_config_prefix"
+
+      # Test 2-arity callback for consistency
+      assert AppConfigOneArityProjector.schema_prefix(event, %{}) == "app_config_prefix"
+    end
+  end
+
   defp assert_schema_prefix(projector, expected_prefix) do
     prefix = schema_prefix(projector, %SchemaEvent{}, %{})
 
