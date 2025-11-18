@@ -4,6 +4,8 @@ locals_without_parens = [
   dispatch: 2,
   identify: 2,
   middleware: 1,
+  project: 2,
+  project: 3,
   router: 1
 ]
 
