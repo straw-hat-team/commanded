@@ -67,15 +67,6 @@ jobs:
       - name: Install dependencies
         run: mix do deps.get, deps.compile
 
-      - name: Check formatting
-        run: mix format --check-formatted
-
-      - name: Check compilation
-        run: mix compile --warnings-as-errors
-
-      - name: Analyse code
-        run: mix credo --strict
-
       - name: Setup Event Store
         env:
           MIX_ENV: test
@@ -85,6 +76,15 @@ jobs:
         run: |
           epmd -daemon
           mix test.all
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Check compilation
+        run: mix compile --warnings-as-errors
+
+      - name: Analyse code
+        run: mix credo --strict
 
       - name: Retrieve Dialyzer PLT cache
         uses: actions/cache@v4

@@ -75,6 +75,8 @@ defmodule Commanded.Mixfile do
       {:jason, "~> 1.4", optional: true},
       {:phoenix_pubsub, "~> 2.1", optional: true},
       {:eventstore, "~> 1.4", optional: true},
+      {:ecto, "~> 3.11", optional: true},
+      {:ecto_sql, "~> 3.11", optional: true},
 
       # Build and test tools
       {:benchfella, "~> 0.3", only: :bench},
@@ -169,6 +171,9 @@ defmodule Commanded.Mixfile do
           Commanded.Middleware.Logger,
           Commanded.Middleware.Pipeline
         ],
+        Projections: [
+          Commanded.Projections.Ecto
+        ],
         Testing: [
           Commanded.AggregateCase,
           Commanded.Assertions.EventAssertions
@@ -181,6 +186,7 @@ defmodule Commanded.Mixfile do
         Commanded.Event,
         Commanded.EventStore,
         Commanded.PubSub,
+        Commanded.Projections,
         Commanded.Registration,
         Commanded.Serialization,
         Commanded.Middleware
@@ -214,8 +220,13 @@ defmodule Commanded.Mixfile do
 
   defp aliases do
     [
-      reset: ["event_store.drop", "setup"],
-      setup: ["event_store.create", "event_store.init"],
+      reset: ["event_store.drop", "ecto.drop", "setup"],
+      setup: [
+        "event_store.create",
+        "event_store.init",
+        "ecto.create",
+        "ecto.migrate"
+      ],
       "test.all": ["test --include distributed --include eventstore_adapter"]
     ]
   end
@@ -223,7 +234,7 @@ defmodule Commanded.Mixfile do
   defp dialyzer do
     [
       ignore_warnings: ".dialyzer_ignore.exs",
-      plt_add_apps: [:ex_unit, :jason, :mix, :phoenix_pubsub],
+      plt_add_apps: [:ex_unit, :jason, :mix, :phoenix_pubsub, :ecto, :ecto_sql],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/commanded.plt"}
     ]

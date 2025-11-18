@@ -95,3 +95,17 @@ This fork maintains an independent release cycle to introduce new features and i
 - Bundled `Commanded.EventStore.Adapters.EventStore` directly into Commanded
 - Eliminates need for separate `commanded_eventstore_adapter` package dependency
 
+---
+
+### **Ecto Projections Integration**
+
+**Changes:**
+- Integrated `Commanded.Projections.Ecto` directly into Commanded
+- Added Ecto and Ecto SQL as optional dependencies
+- Eliminates need for separate `:commanded_ecto_projections` package dependency
+- Uses nested config format: `config :commanded, Commanded.Projections.Ecto`
+
+**Migration from commanded_ecto_projections:**
+- Update dependency to `{:commanded, "~> 2.1"}` with `{:ecto, "~> 3.11"}`
+- Update config from `config :commanded_ecto_projections, repo: MyApp.Repo` to `config :commanded, Commanded.Projections.Ecto, repo: MyApp.Repo`
+- No code changes required - API remains the same
