@@ -100,3 +100,49 @@ This fork maintains an independent release cycle to introduce new features and i
 - Update dependency to `{:commanded, "~> 2.1"}` with `{:ecto, "~> 3.11"}`
 - Update config from `config :commanded_ecto_projections, repo: MyApp.Repo` to `config :commanded, Commanded.Projections.Ecto, repo: MyApp.Repo`
 - No code changes required - API remains the same
+
+### **Timezone-Aware Timestamps for Projections**
+
+**Changes:**
+- `projection_versions` table now uses `timestamp with time zone` for `inserted_at` and `updated_at` columns
+- ProjectionVersion schema updated to use `:utc_datetime_usec` instead of `:naive_datetime_usec`
+- Added migration helper modules for both new and existing installations
+
+**Benefits:**
+- Ensures timestamp values are stored with timezone information
+- Better consistency across different database configurations
+- Prevents timezone-related issues when working with distributed systems
+
+**For new installations (greenfield):**
+```elixir
+defmodule MyApp.Repo.Migrations.CreateProjectionVersionsTable do
+  alias Commanded.Projections.Ecto.Migrations.V01CreateProjectionVersionsTable
+
+  use Ecto.Migration
+
+  def up do
+    V01CreateProjectionVersionsTable.up()
+  end
+
+  def down do
+    V01CreateProjectionVersionsTable.down()
+  end
+end
+```
+
+**For existing installations (upgrade):**
+```elixir
+defmodule MyApp.Repo.Migrations.UpgradeProjectionVersionsTimestamps do
+  alias Commanded.Projections.Ecto.Migrations.V02UpgradeTimestampsToTimezone
+
+  use Ecto.Migration
+
+  def up do
+    V02UpgradeTimestampsToTimezone.up()
+  end
+
+  def down do
+    V02UpgradeTimestampsToTimezone.down()
+  end
+end
+```

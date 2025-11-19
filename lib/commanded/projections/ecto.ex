@@ -574,7 +574,7 @@ if Code.ensure_loaded?(Ecto) do
           schema "projection_versions" do
             field(:last_seen_event_number, :integer)
 
-            timestamps(type: :naive_datetime_usec)
+            timestamps(type: :utc_datetime_usec)
           end
         end
       end

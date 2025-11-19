@@ -453,22 +453,17 @@ When using a prefix for your Ecto schemas you might also want to change the pref
 
     ```elixir
     defmodule CreateSchemaProjectionVersions do
+      alias Commanded.Projections.Ecto.Migrations.V01CreateProjectionVersionsTable
+
       use Ecto.Migration
 
       def up do
         execute("CREATE SCHEMA example_schema_prefix")
-
-        create table(:projection_versions, primary_key: false, prefix: "example_schema_prefix") do
-          add(:projection_name, :text, primary_key: true)
-          add(:last_seen_event_number, :bigint)
-
-          timestamps(type: :naive_datetime_usec)
-        end
+        V01CreateProjectionVersionsTable.up(prefix: "example_schema_prefix")
       end
 
       def down do
-        drop(table(:projection_versions, prefix: "example_schema_prefix"))
-
+        V01CreateProjectionVersionsTable.down(prefix: "example_schema_prefix")
         execute("DROP SCHEMA example_schema_prefix CASCADE")
       end
     end
