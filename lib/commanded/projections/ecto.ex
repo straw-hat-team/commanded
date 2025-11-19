@@ -580,21 +580,6 @@ if Code.ensure_loaded?(Ecto) do
       end
     end
 
-    defmacro project(event, do: block) do
-      IO.warn(
-        "project macro with \"do end\" block is deprecated; use project/2 with function instead",
-        Macro.Env.stacktrace(__ENV__)
-      )
-
-      quote do
-        def handle(unquote(event) = event, metadata) do
-          update_projection(event, metadata, fn var!(multi) ->
-            unquote(block)
-          end)
-        end
-      end
-    end
-
     @doc """
     Project a domain event into a read model by appending one or more operations
     to the `Ecto.Multi` struct passed to the projection function you define
@@ -613,21 +598,6 @@ if Code.ensure_loaded?(Ecto) do
       quote do
         def handle(unquote(event) = event, metadata) do
           update_projection(event, metadata, unquote(lambda))
-        end
-      end
-    end
-
-    defmacro project(event, metadata, do: block) do
-      IO.warn(
-        "project macro with \"do end\" block is deprecated; use project/3 with function instead",
-        Macro.Env.stacktrace(__ENV__)
-      )
-
-      quote do
-        def handle(unquote(event) = event, unquote(metadata) = metadata) do
-          update_projection(event, metadata, fn var!(multi) ->
-            unquote(block)
-          end)
         end
       end
     end
