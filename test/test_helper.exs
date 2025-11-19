@@ -12,7 +12,7 @@ defmodule CreateProjections do
   end
 end
 
-Ecto.Migrator.up(Repo, 20_170_609_120_000, CreateProjections)
+Ecto.Migrator.up(Repo, 20_171_001_000_000, CreateProjections)
 
 ExUnit.start()
 

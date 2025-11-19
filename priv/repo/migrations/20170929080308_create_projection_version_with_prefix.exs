@@ -1,20 +1,15 @@
 defmodule Commanded.Projections.Repo.Migrations.CreateProjectionVersionWithPrefix do
+  alias Commanded.Projections.Ecto.Migrations.V01CreateProjectionVersionsTable
+
   use Ecto.Migration
 
   def up do
     execute("CREATE SCHEMA test")
-
-    create table(:projection_versions, primary_key: false, prefix: "test") do
-      add(:projection_name, :text, primary_key: true)
-      add(:last_seen_event_number, :bigint)
-
-      timestamps(type: :naive_datetime_usec)
-    end
+    V01CreateProjectionVersionsTable.up(prefix: "test")
   end
 
   def down do
-    drop(table(:projection_versions, prefix: "test"))
-
+    V01CreateProjectionVersionsTable.down(prefix: "test")
     execute("DROP SCHEMA test CASCADE")
   end
 end
