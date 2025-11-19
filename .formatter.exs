@@ -6,7 +6,8 @@ locals_without_parens = [
   middleware: 1,
   project: 2,
   project: 3,
-  router: 1
+  router: 1,
+  project_batch: 1
 ]
 
 [
