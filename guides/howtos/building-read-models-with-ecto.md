@@ -1,496 +1,365 @@
-# Building read models with Ecto projections
+# Building Read Models with Ecto Projections
 
-## Creating a read model
+Practical guide for common projection tasks. For conceptual understanding, see the [Ecto Projections explanation guide](../explanations/ecto-projections.html).
 
-Use `Ecto.Schema` to define one or more read models:
+## Create a Basic Projection
+
+**1. Define your read model schema:**
 
 ```elixir
-defmodule ExampleProjection do
+defmodule MyApp.Accounts.Projections.Account do
   use Ecto.Schema
 
-  schema "example_projections" do
-    field(:name, :string)
+  schema "accounts" do
+    field :account_number, :string
+    field :balance, :integer
+    
+    timestamps()
   end
 end
 ```
 
-## Creating a projector
-
-For each read model you will need to define a module that uses the `Commanded.Projections.Ecto` module and projects the appropriate domain events with the `project` macro.
-
-You must specify the following options when defining or starting an Ecto projector:
-
-- `:application` - (module or atom) the Commanded application (e.g. `MyApp.Application`).
-- `:name` - (string) a unique name used to identify the event store subscription used by the projector.
-- `:repo` - (module) an Ecto repo (e.g. `MyApp.Projections.Repo`).
-
-Once a projector has been deployed you _should not_ change its name. Doing so will cause a new event store subscription to be created and replay all existing events.
-
-**Note:** A read model projector is just a specialised Commanded event handler `GenServer` process.
-
-### Example
+**2. Create the projector module:**
 
 ```elixir
-defmodule MyApp.ExampleProjector do
+defmodule MyApp.Accounts.Projectors.AccountProjector do
   use Commanded.Projections.Ecto,
     application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "example_projection"
+    repo: MyApp.Repo,
+    name: "account_projector"
 
-  project %AnEvent{name: name}, _metadata, fn multi ->
-    Ecto.Multi.insert(multi, :example_projection, %ExampleProjection{name: name})
+  alias MyApp.Accounts.Projections.Account
+  alias MyApp.Accounts.Events.{AccountOpened, MoneyDeposited}
+
+  project %AccountOpened{account_number: number, initial_balance: balance}, fn multi ->
+    Ecto.Multi.insert(multi, :account, %Account{
+      account_number: number,
+      balance: balance
+    })
   end
 
-  project %AnotherEvent{name: name}, fn multi ->
-    Ecto.Multi.insert(multi, :example_projection, %ExampleProjection{name: name})
-  end
-end
-```
-
-#### Runtime configuration
-
-The `:application` and `:name` options can be provided at runtime, but `:repo` must be specified at compile-time.
-
-```elixir
-defmodule MyApp.ExampleProjector do
-  use Commanded.Projections.Ecto,
-    repo: MyApp.Projections.Repo
-end
-```
-
-Started with:
-
-```elixir
-{:ok, pid} = ExampleProjector.start_link(application: MyApp.Application, name: "example_projection")
-```
-
-Or supervised:
-
-```elixir
-Supervisor.start_link([
-  {ExampleProjector, application: MyApp.Application, name: "example_projection"}
-], strategy: :one_for_one)
-```
-
-Runtime configuration allows the same projector to be run more than once, with each instance using a separate application or name:
-
-```elixir
-Supervisor.start_link([
-  {ExampleProjector, application: App1, name: "App1.Projector"},
-  {ExampleProjector, application: App2, name: "App2.Projector"}
-], strategy: :one_for_one)
-```
-
-### Subscription options
-
-You can control how events are consumed from the event store using the `:subscription_opts` option. This provides a convenient way to group subscription-related configuration together:
-
-```elixir
-defmodule MyApp.ExampleProjector do
-  use Commanded.Projections.Ecto,
-    application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "example_projection",
-    subscription_opts: [
-      start_from: :origin,      # Start from the first event
-      subscribe_to: :all,       # Subscribe to all streams
-      concurrency: 4            # Process with 4 workers
-    ]
-
-  project %AnEvent{}, _metadata, fn multi ->
-    # Your projection logic
+  project %MoneyDeposited{account_number: number, amount: amount}, fn multi ->
+    Ecto.Multi.update_all(
+      multi,
+      :account,
+      where(Account, account_number: ^number),
+      inc: [balance: ^amount]
+    )
   end
 end
 ```
 
-#### Available subscription options
-
-- **`:start_from`** - Where to begin reading events
-  - `:origin` - Start from the very first event (use for new projections)
-  - `:current` - Start from the current position (skip historical events)
-  - Positive integer - Start from a specific event number
-
-- **`:subscribe_to`** - Which event stream(s) to subscribe to
-  - `:all` - Subscribe to all events (default)
-  - Stream name (string) - Subscribe to a specific stream
-
-- **`:concurrency`** - Number of concurrent workers for parallel processing
-  - Positive integer - Enable concurrent event processing
-  - **Note:** Mutually exclusive with `:batch_size`
-
-#### Alternative: Top-level options
-
-You can also pass these options at the top level instead of nesting them under `:subscription_opts`. Both formats are equivalent:
+**3. Add to your supervision tree:**
 
 ```elixir
-defmodule MyApp.ExampleProjector do
+children = [
+  MyApp.Accounts.Projectors.AccountProjector
+]
+
+Supervisor.start_link(children, strategy: :one_for_one)
+```
+
+## Access Event Metadata
+
+Use the 3-arity version of `project/3` to access metadata:
+
+```elixir
+project %OrderPlaced{order_id: id} = event, metadata, fn multi ->
+  %{event_number: event_number, created_at: timestamp} = metadata
+  
+  Ecto.Multi.insert(multi, :order, %Order{
+    id: id,
+    event_number: event_number,
+    placed_at: timestamp
+  })
+end
+```
+
+## Use Batch Processing for High Throughput
+
+**Configure batch size:**
+
+```elixir
+defmodule MyApp.HighVolumeProjector do
   use Commanded.Projections.Ecto,
     application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "example_projection",
-    start_from: :origin,
-    subscribe_to: :all,
-    concurrency: 4
-end
-```
-
-If you provide both nested and top-level options, the top-level ones take precedence.
-
-### Using the `project` macro
-
-The `project/3` macro expects the domain event, metadata, and a single-arity function that takes and returns an `Ecto.Multi` data structure for grouping multiple Repo operations. These will all be executed within a single transaction. You can use `Ecto.Multi` to insert, update, and delete data.
-
-#### Examples
-
-Project an event and its metadata into a read model with `project/3`:
-
-```elixir
-project %AnEvent{name: name}, metadata, fn multi ->
-  projection = %ExampleProjection{name: name, metadata: metadata}
-
-  Ecto.Multi.insert(multi, :example_projection, projection)
-end
-```
-
-Use `project/2` if you do not need to use the event metadata:
-
-```elixir
-project %AnotherEvent{name: name}, fn multi ->
-  Ecto.Multi.insert(multi, :example_projection, %ExampleProjection{name: name})
-end
-```
-
-If you want to skip a projection event, you can return the `multi` transaction without further modifying it:
-
-```elixir
-project %ItemUpdated{uuid: uuid} = event, _metadata, fn multi ->
-  case Repo.get(ItemProjection, uuid) do
-    nil -> multi
-    item -> Ecto.Multi.update(multi, :item, update_changeset(event, item))
+    repo: MyApp.Repo,
+    name: "high_volume_projector",
+    batch_size: 100
+    
+  # Use project_batch instead of project
+  project_batch fn events, multi ->
+    Enum.reduce(events, multi, fn
+      {%EventA{id: id, data: data}, _metadata}, multi ->
+        Ecto.Multi.insert(multi, {:event_a, id}, %ReadModel{
+          id: id,
+          data: data
+        })
+        
+      {%EventB{id: id}, _metadata}, multi ->
+        Ecto.Multi.update_all(multi, {:event_b, id}, 
+          where(ReadModel, id: ^id),
+          set: [processed: true]
+        )
+        
+      _other, multi ->
+        multi  # Ignore other events
+    end)
   end
 end
 ```
 
-### Using the `project_batch` macro
+## Handle Multiple Tables in One Projection
 
-You can use `project_batch` to receive events in batches. To enable batching, you need to set the `batch_size` and use the `project_batch/1` macro. `project_batch/1` receives a function that takes a list of `{event, metadata}` tuples for all the events in the batch and an `Ecto.Multi` structure, similar to `project/3`.
-
-Note that there is currently no built in way to target a single type of event to be projected, and as such a single `project_batch` macro is expected to gracefully handle (or ignore) any events that it may receive.
-
-#### Example
+Use `Ecto.Multi` operations:
 
 ```elixir
-defmodule MyApp.Projections.BatchProjector do
-  use Commanded.Projections.Ecto,
-      application: MyApp.Application,
-      repo: MyApp.Projections.Repo,
-      name: "example_batch_projection",
-      batch_size: 10
-
-    project_batch fn events, multi ->
-      projections = events
-      |> Enum.map(fn
-        {%AnEvent{name: name}, _metadata} -> %{name: name}
-        _ -> nil
-      end)
-      |> Enum.reject(&is_nil/1)
-
-      Ecto.Multi.insert_all(multi, :example_batch_projection, Projection, projections)
-    end
+project %UserRegistered{user_id: id, email: email}, fn multi ->
+  multi
+  |> Ecto.Multi.insert(:user, %User{id: id, email: email})
+  |> Ecto.Multi.insert(:audit, %AuditLog{
+    action: "user_registered",
+    user_id: id
+  })
+  |> Ecto.Multi.update_all(:stats, StatsQuery, inc: [user_count: 1])
 end
 ```
 
-## Supervision
+## Handle Projection Errors
 
-Your projector module must be included in your application supervision tree:
-
-```elixir
-defmodule MyApp.Projections.Supervisor do
-  use Supervisor
-
-  def start_link(init_arg) do
-    Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
-  end
-
-  @impl true
-  def init(_init_arg) do
-    children = [
-      MyApp.ExampleProjector
-    ]
-
-    Supervisor.init(children, strategy: :one_for_one)
-  end
-end
-```
-
-**Warning:** You should implement an [error handling](#error-handling) strategy in your projector module when supervising to prevent problematic events from causing cascading errors due too many restarts.
-
-## Error handling
-
-### `error/3` callback
-
-The `Commanded.Projections.Ecto` macro defines a Commanded event handler which means you can take advantage of the [`error/3` callback function](https://hexdocs.pm/commanded/Commanded.Event.Handler.html#module-error-3-callback) to handle any errors returned from a `project` function. The error function is passed the error returned by the event handler (e.g. `{:error, error}`), the event causing the error, and a context map containing state passed between retries. Use the context map to track any transient state you need to access between retried failures, such as the number of failed attempts.
-
-You can return one of the following responses depending upon the error severity:
-
-- `{:retry, context}` - retry the failed event, provide a context map containing any state passed to subsequent failures. This could be used to count the number of failures, stopping after too many.
-
-- `{:retry, delay, context}` - retry the failed event, after sleeping for the requested delay (in milliseconds). Context is a map as described in `{:retry, context}` above.
-
-- `:skip` - skip the failed event by acknowledging receipt.
-
-- `{:stop, reason}` - stop the projector with the given reason.
-
-#### Error handling example
-
-Here's an example projector module where an error tagged tuple is explicitly returned from a `project` function, but you can also handle exceptions caused by faulty `Ecto.Multi` database operations in a similar manner since the errors are caught and returned as tagged tuples (e.g. `{:error, %Ecto.ConstraintError{}}`).
+Implement the `error/3` callback:
 
 ```elixir
-defmodule MyApp.ExampleProjector do
+defmodule MyApp.ResilientProjector do
   use Commanded.Projections.Ecto,
     application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "MyApp.ExampleProjector"
+    repo: MyApp.Repo,
+    name: "resilient_projector"
 
   require Logger
-
   alias Commanded.Event.FailureContext
 
-  project %AnEvent{}, fn _multi ->
-    {:error, :failed}
-  end
+  # ... projection logic ...
 
-  def error({:error, :failed}, %AnEvent{}, %FailureContext{}) do
+  def error({:error, %Ecto.ConstraintError{}}, event, %FailureContext{}) do
+    Logger.warning("Constraint violation, skipping event: #{inspect(event)}")
     :skip
   end
 
-  def error({:error, %Ecto.ConstraintError{} = error}, _event, _failure_context) do
-    Logger.error("Failed due to constraint error: " <> inspect(error))
-
-    :skip
-  end
-
-  def error({:error, _error}, _event, _failure_context) do
-    :skip
+  def error({:error, reason}, event, %FailureContext{context: context}) do
+    attempts = Map.get(context, :attempts, 0) + 1
+    
+    if attempts < 3 do
+      Logger.warning("Projection failed, retrying (attempt #{attempts})")
+      {:retry, 5_000, %{attempts: attempts}}
+    else
+      Logger.error("Projection failed after 3 attempts, skipping")
+      :skip
+    end
   end
 end
 ```
 
-### `after_update/3` callback
+## Notify After Projection Updates
 
-You can define an `after_update/3` callback function in a projector to be called after each projected event. The function receives the event, its metadata, and all changes from the `Ecto.Multi` struct that were executed within the database transaction.
+Use the `after_update/3` callback for side effects:
 
 ```elixir
-defmodule MyApp.ExampleProjector do
+defmodule MyApp.NotifyingProjector do
   use Commanded.Projections.Ecto,
     application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "MyApp.ExampleProjector"
+    repo: MyApp.Repo,
+    name: "notifying_projector"
 
-  project %AnEvent{name: name}, fn multi ->
-    Ecto.Multi.insert(multi, :example_projection, %ExampleProjection{name: name})
-  end
+  # ... projection logic ...
 
-  @impl Commanded.Projections.Ecto
-  def after_update(event, metadata, changes) do
-    # Use the event, metadata, or `Ecto.Multi` changes and return `:ok`
+  def after_update(event, metadata, _changes) do
+    Phoenix.PubSub.broadcast(
+      MyApp.PubSub,
+      "projections",
+      {:projection_updated, event, metadata}
+    )
+    
     :ok
   end
 end
 ```
 
-You could use this function to notify subscribers that the read model has been updated (e.g. pub/sub to Phoenix channels).
-
-#### ⚠️ Transaction Semantics
-
-**CRITICAL:** The `after_update/3` callback executes **AFTER** the database transaction has been committed. This means:
-
-- **Errors cannot rollback the transaction** - If this callback returns an error or raises an exception, the projection data is already persisted in the database.
-- **Use for side effects only** - This callback is designed for notifications, pub/sub, external API calls, or other side effects that should happen after successful projection updates.
-- **Error handling implications** - Returning `{:error, reason}` or raising an exception will propagate the error up, but the database changes are permanent. The event handler may retry, potentially causing duplicate side effects.
-
-If you need to perform validation or operations that should prevent the projection from being saved, do so within your `project/2` function (inside the `Ecto.Multi`), not in this callback.
-
-### `after_update_batch/2` callback
-
-Similarly for batching projectors, you can define an `after_update_batch/2` callback function in a projector to be called after a batch of events has been projected. The function receives a list of `{event, metadata}` tuples for each processed event and all changes from the `Ecto.Multi` struct.
+For batch projectors, use `after_update_batch/2`:
 
 ```elixir
-defmodule MyApp.BatchProjector do
-  use Commanded.Projections.Ecto,
-    application: MyApp.Application,
-    repo: MyApp.Projections.Repo,
-    name: "MyApp.BatchProjector",
-    batch_size: 10
+def after_update_batch(events, _changes) do
+  count = length(events)
+  
+  Phoenix.PubSub.broadcast(
+    MyApp.PubSub,
+    "projections",
+    {:batch_projected, count}
+  )
+  
+  :ok
+end
+```
 
-  project_batch fn events, multi ->
-    # Your batch projection logic
+## Configure Multi-Tenant Projections
+
+**Option 1: Static schema prefix**
+
+```elixir
+use Commanded.Projections.Ecto,
+  application: MyApp.Application,
+  repo: MyApp.Repo,
+  name: "tenant_a_projector",
+  schema_prefix: "tenant_a"
+```
+
+**Option 2: Dynamic per-event prefix**
+
+```elixir
+use Commanded.Projections.Ecto,
+  application: MyApp.Application,
+  repo: MyApp.Repo,
+  name: "multi_tenant_projector"
+
+def schema_prefix(%_{tenant_id: tenant_id}, _metadata) do
+  "tenant_#{tenant_id}"
+end
+```
+
+**Option 3: Function-based prefix**
+
+```elixir
+use Commanded.Projections.Ecto,
+  application: MyApp.Application,
+  repo: MyApp.Repo,
+  name: "function_prefix_projector",
+  schema_prefix: fn event, _metadata -> 
+    determine_schema(event)
   end
+```
 
-  @impl Commanded.Projections.Ecto
-  def after_update_batch(events, changes) do
-    # Notify subscribers about the batch update
-    :ok
+## Subscribe to Specific Streams
+
+```elixir
+use Commanded.Projections.Ecto,
+  application: MyApp.Application,
+  repo: MyApp.Repo,
+  name: "account_projector",
+  subscription_opts: [
+    subscribe_to: "account-*",
+    start_from: :origin
+  ]
+```
+
+Or use top-level options:
+
+```elixir
+use Commanded.Projections.Ecto,
+  application: MyApp.Application,
+  repo: MyApp.Repo,
+  name: "account_projector",
+  subscribe_to: "account-*",
+  start_from: :origin
+```
+
+## Rebuild a Projection
+
+**1. Stop the projector**
+
+**2. Delete the projection version:**
+
+```sql
+DELETE FROM projection_versions
+WHERE projection_name = 'account_projector';
+```
+
+**3. Clear the read model tables:**
+
+```sql
+TRUNCATE TABLE accounts RESTART IDENTITY CASCADE;
+```
+
+**4. Reset the event store subscription:**
+
+For EventStore adapter:
+
+```elixir
+MyApp.EventStore.delete_subscription("account_projector")
+```
+
+**5. Restart the projector**
+
+The projector will replay all events from the beginning.
+
+## Configure Runtime Options
+
+Define projector without compile-time config:
+
+```elixir
+defmodule MyApp.RuntimeProjector do
+  use Commanded.Projections.Ecto,
+    repo: MyApp.Repo
+    
+  # ... projection logic ...
+end
+```
+
+Start with runtime configuration:
+
+```elixir
+{:ok, pid} = MyApp.RuntimeProjector.start_link(
+  application: MyApp.Application,
+  name: "runtime_projector"
+)
+```
+
+Or in supervision tree:
+
+```elixir
+children = [
+  {MyApp.RuntimeProjector, 
+   application: MyApp.Application, 
+   name: "runtime_projector"}
+]
+```
+
+## Skip Events Conditionally
+
+Return the multi unchanged:
+
+```elixir
+project %ItemUpdated{id: id} = event, _metadata, fn multi ->
+  case Repo.get(Item, id) do
+    nil -> 
+      multi  # Skip - item doesn't exist
+      
+    item -> 
+      changeset = update_changeset(item, event)
+      Ecto.Multi.update(multi, :item, changeset)
   end
 end
 ```
 
-#### ⚠️ Transaction Semantics
+## Common Options Reference
 
-**CRITICAL:** The `after_update_batch/2` callback executes **AFTER** the database transaction has been committed. This means:
+### Required Options
 
-- **Errors cannot rollback the transaction** - If this callback returns an error or raises an exception, the projection data is already persisted in the database.
-- **Use for side effects only** - This callback is designed for notifications, pub/sub, external API calls, or other side effects that should happen after successful projection updates.
-- **Error handling implications** - Returning `{:error, reason}` or raising an exception will propagate the error up, but the database changes are permanent. The event handler may retry, potentially causing duplicate side effects.
+- `:application` - The Commanded application module
+- `:name` - Unique projector name (string)
+- `:repo` - Ecto repo module
 
-If you need to perform validation or operations that should prevent the projection from being saved, do so within your `project_batch/2` function (inside the `Ecto.Multi`), not in this callback.
+### Subscription Options
 
-## Schema prefix
+- `:start_from` - `:origin`, `:current`, or event number
+- `:subscribe_to` - `:all` or stream name/pattern
 
-When using a prefix for your Ecto schemas you might also want to change the prefix for the `ProjectionVersion` schema. There are a number of options to do this:
+### Performance Options
 
-1. Define a global static prefix via environment config:
+- `:batch_size` - Number of events per transaction (integer)
+- `:timeout` - Transaction timeout in milliseconds
 
-    ```elixir
-    # config/config.exs
-    config :commanded, Commanded.Projections.Ecto,
-      schema_prefix: "example_schema_prefix"
-    ```
+### Schema Options
 
-2. Provide a static `schema_prefix` as a projector option:
+- `:schema_prefix` - String, 1-arity function, or 2-arity function
 
-    ```elixir
-    defmodule MyApp.ExampleProjector do
-      use Commanded.Projections.Ecto,
-        application: MyApp.Application,
-        repo: MyApp.Projections.Repo,
-        name: "example_projection",
-        schema_prefix: "example_schema_prefix"
-    end
-    ```
-
-3. Provide a one-arity function as a `schema_prefix` projector option:
-
-    ```elixir
-    defmodule MyApp.ExampleProjector do
-      use Commanded.Projections.Ecto,
-        application: MyApp.Application,
-        repo: MyApp.Projections.Repo,
-        name: "example_projection",
-        schema_prefix: fn event -> "example_schema_prefix" end
-    end
-    ```
-
-    The function will receive the event as the single argument allowing you to use the same or a different schema for each event.
-
-4. Provide a two-arity function as a `schema_prefix` projector option:
-
-    ```elixir
-    defmodule MyApp.ExampleProjector do
-      use Commanded.Projections.Ecto,
-        application: MyApp.Application,
-        repo: MyApp.Projections.Repo,
-        name: "example_projection",
-        schema_prefix: fn event, metadata -> "example_schema_prefix" end
-    end
-    ```
-
-    The function will receive the event and its associated metadata as the two arguments allowing you to use the same or a different schema for each event. The metadata will also include the enriched fields such as the application, event handler name, and optional handler state.
-
-5. Define a `schema_prefix/1` callback function:
-
-    ```elixir
-    defmodule MyApp.ExampleProjector do
-      use Commanded.Projections.Ecto,
-        application: MyApp.Application,
-        name: "example_projection"
-
-      @impl Commanded.Projections.Ecto
-      def schema_prefix(event), do: "example_schema_prefix"
-    end
-    ```
-
-    The function will receive the event as the single argument allowing you to use the same or a different schema for each event.
-
-    An example usage could be for tenant specific projections where each tenant's data is projected and stored in a separate database schema:
-
-    ```elixir
-    @impl Commanded.Projections.Ecto
-    def schema_prefix(%_{tenant: tenant}), do: tenant
-    ```
-
-6. Define a `schema_prefix/2` callback function:
-
-    ```elixir
-    defmodule MyApp.ExampleProjector do
-      use Commanded.Projections.Ecto,
-        application: MyApp.Application,
-        name: "example_projection"
-
-      @impl Commanded.Projections.Ecto
-      def schema_prefix(event, metadata), do: "example_schema_prefix"
-    end
-    ```
-
-    The function will receive the event and its associated metadata as the two arguments allowing you to use the same or a different schema for each event. The metadata will also include the enriched fields such as the application, event handler name, and optional handler state.
-
-    An example usage could be for tenant specific projections where each tenant's data is projected and stored in a separate database schema:
-
-    ```elixir
-    @impl Commanded.Projections.Ecto
-    def schema_prefix(%_{tenant: tenant}, _metadata), do: tenant
-    ```
-
-### Migrations with a schema prefix
-
-1. Generate an Ecto migration in your app:
-
-    ```shell
-    mix ecto.gen.migration create_schema_projection_versions
-    ```
-
-2. Modify the generated migration, in `priv/repo/migrations`, to create the schema and a `projection_versions` table for the schema:
-
-    ```elixir
-    defmodule CreateSchemaProjectionVersions do
-      alias Commanded.Projections.Ecto.Migrations.V01CreateProjectionVersionsTable
-
-      use Ecto.Migration
-
-      def up do
-        execute("CREATE SCHEMA example_schema_prefix")
-        V01CreateProjectionVersionsTable.up(prefix: "example_schema_prefix")
-      end
-
-      def down do
-        V01CreateProjectionVersionsTable.down(prefix: "example_schema_prefix")
-        execute("DROP SCHEMA example_schema_prefix CASCADE")
-      end
-    end
-    ```
-
-    Note you will need to do this for each schema prefix you use.
-
-## Rebuilding a projection
-
-The `projection_versions` table is used to ensure that events are only projected once.
-
-To rebuild a projection you will need to:
-
-1. Delete the row containing the last seen event for the projection name:
-
-    ```SQL
-    DELETE FROM projection_versions
-    WHERE projection_name = 'example_projection';
-    ```
-
-2. Truncate the tables that are being populated by the projection, and restart their identity:
-
-    ```SQL
-    TRUNCATE TABLE
-      example_projections,
-      other_projections
-    RESTART IDENTITY;
-    ```
-
-You will also need to reset the event store subscription for the commanded event handler. This is specific to whichever event store you are using.
+See the [Ecto Projections explanation guide](../explanations/ecto-projections.html) for architectural details and the moduledoc for complete API reference.

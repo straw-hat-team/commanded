@@ -61,10 +61,27 @@ if Code.ensure_loaded?(Ecto) do
     - Only static `:schema_prefix` strings allowed (no dynamic functions)
     - Uses watermark-based idempotency for efficient batch processing
 
+    ## Concurrency Limitation
+
+    > #### Concurrency Not Supported {: .error}
+    >
+    > Ecto projections do NOT support `:concurrency > 1` due to the risk of silent
+    > data loss from out-of-order event processing.
+    >
+    > **Why?** When events are processed concurrently across multiple workers, they may
+    > arrive out of order (e.g., event #5 processed before event #4). The watermark-based
+    > idempotency check (`last_seen_event_number`) will skip the earlier event permanently,
+    > causing data loss.
+    >
+    > **Solution:** Use `:batch_size` instead of `:concurrency` for high-throughput
+    > processing. Batch processing maintains event ordering while providing excellent
+    > performance by processing multiple events in a single database transaction.
+
     ## Guides
 
     - [Getting started](ecto-projections-getting-started.html)
-    - [Building read models](building-read-models-with-ecto.html)
+    - [Building read models](building-read-models-with-ecto.html) (how-to)
+    - [Ecto Projections](ecto-projections.html) (explanation)
 
     """
 
@@ -80,10 +97,22 @@ if Code.ensure_loaded?(Ecto) do
         {_, nil} ->
           :ok
 
-        {_batch_size, _concurrency} ->
+        {_, 1} ->
+          # concurrency: 1 is the default (sequential) and doesn't conflict with batch_size
+          :ok
+
+        {_batch_size, concurrency} when is_integer(concurrency) and concurrency > 1 ->
           {:error,
-           "cannot use both :batch_size and :concurrency options - they are mutually exclusive. " <>
+           "cannot use both :batch_size and :concurrency > 1 - they are mutually exclusive. " <>
              "Use :batch_size for batch processing OR :concurrency for concurrent processing, but not both."}
+
+        _ ->
+          # Allow other combinations:
+          # - batch_size without concurrency
+          # - concurrency without batch_size
+          # - batch_size with concurrency: 1 (already handled above)
+          # Note: Invalid concurrency values are caught by validate_concurrency_compatibility/1
+          :ok
       end
     end
 
@@ -96,6 +125,36 @@ if Code.ensure_loaded?(Ecto) do
            "Either remove :batch_size or change :schema_prefix to a string."}
       else
         :ok
+      end
+    end
+
+    @doc false
+    def validate_concurrency_compatibility(opts) do
+      concurrency = Keyword.get(opts, :concurrency)
+
+      case concurrency do
+        nil ->
+          :ok
+
+        1 ->
+          :ok
+
+        value when is_integer(value) and value > 1 ->
+          {:error,
+           "Ecto projections do not support :concurrency > 1 due to out-of-order event processing that can cause silent data loss. " <>
+             "Events processed concurrently may arrive out of order (e.g., event #5 before event #4), " <>
+             "causing the watermark-based idempotency check to permanently skip earlier events. " <>
+             "Use :batch_size instead for high-throughput processing with ordering guarantees."}
+
+        value when is_integer(value) ->
+          {:error,
+           "Invalid :concurrency value #{inspect(value)}. " <>
+             "Concurrency must be a positive integer (1 or greater)."}
+
+        invalid_value ->
+          {:error,
+           "Invalid :concurrency value #{inspect(invalid_value)}. " <>
+             "Expected a positive integer, got: #{inspect(invalid_value)}"}
       end
     end
 
@@ -360,13 +419,16 @@ if Code.ensure_loaded?(Ecto) do
           Application.get_env(:commanded, Commanded.Projections.Ecto, [])
           |> Keyword.get(:schema_prefix)
 
-      # Validate mutual exclusivity
+      case validate_concurrency_compatibility(opts) do
+        :ok -> :ok
+        {:error, message} -> raise CompileError, description: message
+      end
+
       case validate_mutual_exclusivity(opts) do
         :ok -> :ok
         {:error, message} -> raise CompileError, description: message
       end
 
-      # Validate batch schema prefix compatibility
       case validate_batch_schema_prefix_compatibility(batch_size, schema_prefix) do
         :ok -> :ok
         {:error, message} -> raise CompileError, description: message
@@ -380,8 +442,6 @@ if Code.ensure_loaded?(Ecto) do
                 Application.compile_env(:commanded, [Commanded.Projections.Ecto, :repo]) ||
                 raise("Commanded Ecto projections expects :repo to be configured in environment")
         @timeout @opts[:timeout] || :infinity
-
-        # Pass through any other configuration to the event handler
         @handler_opts Keyword.drop(@opts, [:repo, :schema_prefix, :timeout])
 
         unquote(__include_schema_prefix__(schema_prefix))

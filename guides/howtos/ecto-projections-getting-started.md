@@ -72,4 +72,4 @@ Commanded includes built-in support for read model projections using Ecto. You s
     end
     ```
 
-Refer to the [Building Read Models with Ecto](building-read-models-with-ecto.html) guide for more detail on how to configure and use a read model projector.
+See the [Building Read Models with Ecto](building-read-models-with-ecto.html) how-to guide for practical examples, and the [Ecto Projections](../explanations/ecto-projections.html) explanation guide for architectural details.
