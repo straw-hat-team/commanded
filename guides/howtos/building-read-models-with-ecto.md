@@ -1,6 +1,6 @@
 # Building Read Models with Ecto Projections
 
-Practical guide for common projection tasks. For conceptual understanding, see the [Ecto Projections explanation guide](../explanations/ecto-projections.html).
+Practical guide for common projection tasks. For conceptual understanding, see the [Ecto Projections explanation guide](../explanations/ecto-projections.md).
 
 ## Create a Basic Projection
 
@@ -362,4 +362,4 @@ end
 
 - `:schema_prefix` - String, 1-arity function, or 2-arity function
 
-See the [Ecto Projections explanation guide](../explanations/ecto-projections.html) for architectural details and the moduledoc for complete API reference.
+See the [Ecto Projections explanation guide](../explanations/ecto-projections.md) for architectural details and the moduledoc for complete API reference.

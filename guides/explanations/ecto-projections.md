@@ -1,6 +1,10 @@
 # Ecto Projections
 
+This document explains the architecture, design decisions, and concepts behind Ecto projections in Commanded. Understanding these concepts will help you build robust read models.
+
 Ecto projections allow you to build read models from domain events using Ecto as the database layer. They provide automatic idempotency guarantees, transaction support, and efficient batch processing.
+
+**See also:** [Building Read Models How-To](../howtos/building-read-models-with-ecto.md) for practical examples
 
 ## What are Ecto Projections?
 
@@ -35,6 +39,85 @@ This approach is:
 - **Fast** - One row per projector (not one row per event)
 - **Correct** - Works perfectly for sequential processing
 
+### Projection Watermark vs Event Store Checkpoint
+
+> #### Common Question {: .info}
+>
+> "Why is my `projection_versions.last_seen_event_number` (1000) different from my event store subscription checkpoint (1500)? Is this a bug?"
+
+**No, this is expected behavior.** These two numbers track different things:
+
+**Projection Watermark (`projection_versions` table):**
+- Updated ONLY when an event is **actually projected**
+- Shows the last event that was **processed by your projection logic**
+- Stored in your application database
+
+**Event Store Subscription Checkpoint:**
+- Updated after EVERY event is **delivered to the handler**
+- Shows the last event that was **seen by the subscription**
+- Stored by the event store (EventStore or other)
+
+#### Why They Differ
+
+The projection watermark and subscription checkpoint will differ when:
+
+1. **Event is not handled by projector:**
+```elixir
+# Your projector only handles AccountOpened events
+project %AccountOpened{}, _metadata, fn multi ->
+  # Watermark updates here (when transaction commits)
+  Ecto.Multi.insert(multi, :account, ...)
+end
+
+# When AccountClosed event arrives:
+# - Subscription checkpoint moves forward (event was delivered)
+# - Projection watermark stays the same (event not projected)
+```
+
+2. **Multiple event types, selective projection:**
+```elixir
+# Events 1-10 arrive, but only events 2, 5, 8 match your projection
+# Subscription checkpoint: 10
+# Projection watermark: 8 (last projected event)
+```
+
+3. **Idempotency check fails (event already seen):**
+```elixir
+# Event arrives but watermark shows it was already processed
+# - Subscription checkpoint moves forward
+# - Projection watermark stays the same (no work done)
+```
+
+#### Monitoring Implications
+
+When monitoring projections, understand what each metric means:
+
+**Projection Watermark** tells you:
+- ✅ Last event your business logic processed
+- ✅ Progress of your actual read model
+- ✅ What data is in your projection tables
+
+**Subscription Checkpoint** tells you:
+- ✅ Last event delivered by event store
+- ✅ Connection health to event store
+- ✅ If subscription is keeping up
+
+**Both are correct.** The gap between them is normal and expected when:
+- Your projector is selective (doesn't project all events)
+- Events are being skipped due to idempotency
+- Your projector subscribes to specific streams only
+
+#### What to Alert On
+
+**Good metrics:**
+- Projection watermark not advancing (projector may be stuck)
+- Subscription checkpoint not advancing (connection issue)
+- Gap between watermark and checkpoint growing significantly (performance issue or projector not handling events)
+
+**Don't alert on:**
+- Static difference between watermark and checkpoint (normal when selective)
+- Small gaps (expected with idempotency checks)
+
 ### Transaction Semantics
 
 All projection operations happen within a database transaction:
@@ -46,7 +129,7 @@ Ecto.Multi.new()
 |> Repo.transaction()
 ```
 
-If any step fails, the entire transaction rolls back, including the watermark update. This ensures consistency.
+The watermark update and your projection logic are atomic - both succeed or both fail. If any step fails, the entire transaction rolls back, including the watermark update. This ensures consistency and guarantees exactly-once processing semantics.
 
 ### After-Update Callbacks
 
@@ -136,6 +219,167 @@ The `projection_versions` table will be read/written in the tenant's schema, ens
 > Batch projectors only support **static** schema prefixes (strings), not dynamic functions.
 > This is because the entire batch must use the same schema - we can't mix events from
 > different tenants in a single transaction.
+
+## Consistency Guarantees
+
+Ecto projections support two consistency levels that control when command dispatch returns relative to projection updates.
+
+### Eventual Consistency (Default)
+
+With eventual consistency, command dispatch returns immediately after events are persisted to the event store, without waiting for projections to update:
+
+```elixir
+defmodule MyApp.AccountProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp,
+    repo: MyApp.Repo,
+    name: "account_projector",
+    consistency: :eventual  # Or omit (this is the default)
+
+  project %AccountOpened{}, _metadata, fn multi ->
+    Ecto.Multi.insert(multi, :account, %Account{...})
+  end
+end
+```
+
+**Characteristics:**
+- ✅ **Fast command dispatch** - Returns immediately after event persistence
+- ✅ **Best throughput** - No blocking on projections
+- ❌ **Read-your-own-writes not guaranteed** - Projection might not be updated yet when command returns
+
+**Use when:**
+- Commands and queries happen in different requests
+- Slight delay in read model updates is acceptable
+- Maximizing command throughput is important
+
+### Strong Consistency
+
+With strong consistency, command dispatch waits for all `:strong` projections to complete before returning:
+
+```elixir
+defmodule MyApp.AccountProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp,
+    repo: MyApp.Repo,
+    name: "account_projector",
+    consistency: :strong
+
+  project %AccountOpened{account_id: id, name: name}, _metadata, fn multi ->
+    Ecto.Multi.insert(multi, :account, %Account{id: id, name: name})
+  end
+end
+```
+
+**Characteristics:**
+- ✅ **Read-your-own-writes guaranteed** - Projection is updated before command returns
+- ✅ **Immediate consistency** - Can query read model immediately after command
+- ❌ **Slower command dispatch** - Waits for projection to complete
+- ❌ **Not a transaction** - Events are persisted even if projection fails
+
+**Use when:**
+- You need to query the read model immediately after the command
+- User needs to see their changes right away
+- Implementing CQRS with synchronous reads
+
+### How Consistency Affects Command Dispatch
+
+The consistency setting controls when command dispatch returns relative to projection updates:
+
+**With `:eventual` (default):**
+- Command dispatch returns immediately after events are persisted
+- Projections process events asynchronously
+- Query immediately after dispatch may not show updates
+
+**With `:strong`:**
+- Command dispatch waits for all `:strong` projections to complete
+- Projections are guaranteed to be updated when dispatch returns
+- Query immediately after dispatch will show updates
+
+> For usage examples, see module documentation for `Commanded.Projections.Ecto`
+
+### Important Notes
+
+**Consistency is Not a Transaction:**
+
+Strong consistency guarantees the projection handler has processed the events, but it does NOT mean:
+- ❌ Projection and command are in same database transaction
+- ❌ Projection success affects event persistence
+- ❌ Projection failure rolls back the events
+
+Even with `:strong` consistency:
+- Events are persisted first
+- Then projections process them
+- If projection fails, events remain persisted
+- The projection will retry on its own
+
+**What Strong Consistency Guarantees:**
+
+```elixir
+# With :strong consistency
+{:ok, _} = MyApp.dispatch(command, consistency: :strong)
+
+# At this point, you are guaranteed:
+# ✅ Events are persisted in event store
+# ✅ All :strong projections have processed the events
+# ✅ All :strong projection transactions have committed
+# ✅ Read model is up-to-date with these events
+
+# You are NOT guaranteed:
+# ❌ No errors occurred during projection (it may have retried)
+# ❌ Other :eventual projections have processed the events
+```
+
+**Error Handling:**
+
+If a `:strong` projection fails:
+- The projection will retry according to its `error/3` callback
+- Command dispatch will wait for successful projection
+- If projection continues to fail, command dispatch will timeout
+- But the events are already persisted
+
+### Combining with Batch Processing
+
+Consistency works with batch processing:
+
+```elixir
+defmodule MyApp.FastAccountProjector do
+  use Commanded.Projections.Ecto,
+    application: MyApp,
+    repo: MyApp.Repo,
+    name: "fast_account_projector",
+    batch_size: 50,        # ✅ Batching for performance
+    consistency: :strong    # ✅ Strong consistency for reads
+
+  project_batch fn events, multi ->
+    # Process batch
+  end
+end
+
+# Command dispatch waits for entire batch to be processed
+MyApp.dispatch(command, consistency: :strong)
+```
+
+**Trade-off:** Strong consistency with batching means command dispatch waits for the batch to fill and process. This can add latency.
+
+### When to Use Each
+
+**Use `:eventual` (default) when:**
+- Commands and queries are in separate HTTP requests
+- Slight delay (milliseconds to seconds) is acceptable
+- You want maximum command throughput
+- Processing background/async workflows
+
+**Use `:strong` when:**
+- User expects to see their changes immediately
+- You query the read model right after the command
+- Implementing synchronous APIs
+- Testing (easier to write tests when reads are immediate)
+
+**Example Scenario:**
+
+In a user registration flow, you might use eventual consistency for sending welcome emails (can be delayed) but strong consistency for the user profile projection (must be immediately queryable for the next page load).
+
+> For complete code examples, see [Building Read Models How-To](../howtos/building-read-models-with-ecto.md)
 
 ## Design Decisions
 
