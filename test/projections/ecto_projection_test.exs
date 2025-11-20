@@ -190,4 +190,236 @@ defmodule Commanded.Projections.EctoProjectionTest do
       UnnamedProjector.start_link()
     end
   end
+
+  describe "concurrency validation" do
+    test "should allow concurrency: 1" do
+      defmodule TestConcurrency1Projector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "TestConcurrency1Projector",
+          repo: Commanded.Projections.Repo,
+          concurrency: 1
+
+        project(%AnEvent{name: name}, _metadata, fn multi ->
+          Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+        end)
+      end
+
+      assert Code.ensure_loaded?(TestConcurrency1Projector)
+    end
+
+    test "should allow no concurrency option" do
+      defmodule TestNoConcurrencyProjector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "TestNoConcurrencyProjector",
+          repo: Commanded.Projections.Repo
+
+        project(%AnEvent{name: name}, _metadata, fn multi ->
+          Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+        end)
+      end
+
+      assert Code.ensure_loaded?(TestNoConcurrencyProjector)
+    end
+
+    test "should reject concurrency > 1 in top-level options" do
+      assert_raise CompileError, ~r/Ecto projections do not support :concurrency > 1/, fn ->
+        defmodule TestConcurrencyRejectedProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestConcurrencyRejectedProjector",
+            repo: Commanded.Projections.Repo,
+            concurrency: 4
+
+          project(%AnEvent{name: name}, _metadata, fn multi ->
+            Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+          end)
+        end
+      end
+    end
+
+    test "error message should explain the risk" do
+      error =
+        assert_raise CompileError, fn ->
+          defmodule TestErrorMessageProjector do
+            use Commanded.Projections.Ecto,
+              application: TestApplication,
+              name: "TestErrorMessageProjector",
+              repo: Commanded.Projections.Repo,
+              concurrency: 2
+
+            project(%AnEvent{name: name}, _metadata, fn multi ->
+              Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+            end)
+          end
+        end
+
+      assert error.description =~ "out-of-order event processing"
+      assert error.description =~ "silent data loss"
+      assert error.description =~ ":batch_size"
+    end
+
+    test "should explain batch_size as alternative" do
+      error =
+        assert_raise CompileError, fn ->
+          defmodule TestBatchSizeAlternativeProjector do
+            use Commanded.Projections.Ecto,
+              application: TestApplication,
+              name: "TestBatchSizeAlternativeProjector",
+              repo: Commanded.Projections.Repo,
+              concurrency: 5
+
+            project(%AnEvent{name: name}, _metadata, fn multi ->
+              Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+            end)
+          end
+        end
+
+      assert error.description =~ "Use :batch_size instead"
+    end
+  end
+
+  describe "batch_size and concurrency mutual exclusivity" do
+    test "should allow batch_size with concurrency: 1" do
+      defmodule TestBatchAndConcurrency1Projector do
+        use Commanded.Projections.Ecto,
+          application: TestApplication,
+          name: "TestBatchAndConcurrency1Projector",
+          repo: Commanded.Projections.Repo,
+          batch_size: 10,
+          concurrency: 1
+
+        project_batch(fn events, multi ->
+          Enum.reduce(events, multi, fn {%AnEvent{name: name}, _metadata}, multi ->
+            Ecto.Multi.insert(multi, {:projection, name}, %Projection{name: name})
+          end)
+        end)
+      end
+
+      assert Code.ensure_loaded?(TestBatchAndConcurrency1Projector)
+    end
+
+    test "should reject batch_size with concurrency > 1" do
+      assert_raise CompileError, ~r/Ecto projections do not support :concurrency > 1/, fn ->
+        defmodule TestBatchAndConcurrencyRejectedProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestBatchAndConcurrencyRejectedProjector",
+            repo: Commanded.Projections.Repo,
+            batch_size: 10,
+            concurrency: 4
+
+          project_batch(fn events, multi ->
+            Enum.reduce(events, multi, fn {%AnEvent{name: name}, _metadata}, multi ->
+              Ecto.Multi.insert(multi, {:projection, name}, %Projection{name: name})
+            end)
+          end)
+        end
+      end
+    end
+  end
+
+  describe "invalid concurrency values" do
+    test "should reject atom concurrency value" do
+      assert_raise CompileError, ~r/Invalid :concurrency value :foo/, fn ->
+        defmodule TestAtomConcurrencyProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestAtomConcurrencyProjector",
+            repo: Commanded.Projections.Repo,
+            concurrency: :foo
+
+          project(%AnEvent{name: name}, _metadata, fn multi ->
+            Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+          end)
+        end
+      end
+    end
+
+    test "should reject string concurrency value" do
+      assert_raise CompileError, ~r/Invalid :concurrency value "2"/, fn ->
+        defmodule TestStringConcurrencyProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestStringConcurrencyProjector",
+            repo: Commanded.Projections.Repo,
+            concurrency: "2"
+
+          project(%AnEvent{name: name}, _metadata, fn multi ->
+            Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+          end)
+        end
+      end
+    end
+
+    test "should reject list concurrency value" do
+      assert_raise CompileError, ~r/Invalid :concurrency value \[1, 2\]/, fn ->
+        defmodule TestListConcurrencyProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestListConcurrencyProjector",
+            repo: Commanded.Projections.Repo,
+            concurrency: [1, 2]
+
+          project(%AnEvent{name: name}, _metadata, fn multi ->
+            Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+          end)
+        end
+      end
+    end
+
+    test "should reject zero concurrency value" do
+      assert_raise CompileError, ~r/Invalid :concurrency value 0/, fn ->
+        defmodule TestZeroConcurrencyProjector do
+          use Commanded.Projections.Ecto,
+            application: TestApplication,
+            name: "TestZeroConcurrencyProjector",
+            repo: Commanded.Projections.Repo,
+            concurrency: 0
+
+          project(%AnEvent{name: name}, _metadata, fn multi ->
+            Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+          end)
+        end
+      end
+    end
+
+    test "should reject negative concurrency value" do
+      assert_raise CompileError,
+                   ~r/Invalid :concurrency value.*Expected a positive integer/,
+                   fn ->
+                     defmodule TestNegativeConcurrencyProjector do
+                       use Commanded.Projections.Ecto,
+                         application: TestApplication,
+                         name: "TestNegativeConcurrencyProjector",
+                         repo: Commanded.Projections.Repo,
+                         concurrency: -1
+
+                       project(%AnEvent{name: name}, _metadata, fn multi ->
+                         Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+                       end)
+                     end
+                   end
+    end
+
+    test "error message should specify expected type" do
+      error =
+        assert_raise CompileError, fn ->
+          defmodule TestErrorMessageTypeProjector do
+            use Commanded.Projections.Ecto,
+              application: TestApplication,
+              name: "TestErrorMessageTypeProjector",
+              repo: Commanded.Projections.Repo,
+              concurrency: :bad_value
+
+            project(%AnEvent{name: name}, _metadata, fn multi ->
+              Ecto.Multi.insert(multi, :projection, %Projection{name: name})
+            end)
+          end
+        end
+
+      assert error.description =~ "Expected a positive integer"
+    end
+  end
 end
