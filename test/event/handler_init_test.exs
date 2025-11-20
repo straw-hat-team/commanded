@@ -1,11 +1,8 @@
 defmodule Commanded.Event.HandlerInitTest do
   use Commanded.MockEventStoreCase
 
-  import Mox
-
   alias Commanded.DefaultApp
-  alias Commanded.Event.{EchoHandler, Handler, InitHandler, ReplyEvent, RuntimeConfigHandler}
-  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
+  alias Commanded.Event.{EchoHandler, Handler, ReplyEvent, RuntimeConfigHandler}
   alias Commanded.Helpers.{EventFactory, Wait}
 
   describe "event handler `init/1` callback" do
@@ -43,31 +40,6 @@ defmodule Commanded.Event.HandlerInitTest do
       assert_receive {:init, :tenant1}
       assert_receive {:init, :tenant1}
       refute_receive {:init, :tenant1}
-    end
-  end
-
-  describe "event handler `init/0` callback" do
-    setup do
-      true = Process.register(self(), :test)
-
-      expect(MockEventStore, :subscribe_to, fn
-        _event_store, :all, handler_name, handler, _subscribe_from, _opts ->
-          assert is_binary(handler_name)
-
-          {:ok, handler}
-      end)
-
-      handler = start_supervised!(InitHandler)
-
-      [handler: handler]
-    end
-
-    test "should be called after subscription subscribed", %{handler: handler} do
-      refute_receive {:init, ^handler}
-
-      send_subscribed(handler)
-
-      assert_receive {:init, ^handler}
     end
   end
 
@@ -120,10 +92,6 @@ defmodule Commanded.Event.HandlerInitTest do
     post_otp_28 = {:current_function, {:gen_server, :loop_hibernate, 4}}
 
     assert Process.info(pid, :current_function) in [pre_otp_28, post_otp_28]
-  end
-
-  defp send_subscribed(handler) do
-    send(handler, {:subscribed, handler})
   end
 
   defp send_events(handler, events) do

@@ -417,9 +417,6 @@ defmodule Commanded.Event.Handler do
   @type subscribe_from :: :origin | :current | non_neg_integer()
   @type consistency :: :eventual | :strong
 
-  @doc deprecated: "Use the after_start/1 callback instead."
-  @callback init() :: :ok | {:stop, reason :: any()}
-
   @doc """
   Optional initialisation callback function called when the handler starts.
 
@@ -616,8 +613,7 @@ defmodule Commanded.Event.Handler do
   """
   @callback before_reset() :: :ok
 
-  @optional_callbacks init: 0,
-                      init: 1,
+  @optional_callbacks init: 1,
                       error: 3,
                       partition_by: 2,
                       before_reset: 0,
@@ -711,12 +707,7 @@ defmodule Commanded.Event.Handler do
 
       @doc false
       def after_start(_state) do
-        # TODO: remove this when we remove init/0
-        if function_exported?(__MODULE__, :init, 0) do
-          apply(__MODULE__, :init, [])
-        else
-          :ok
-        end
+        :ok
       end
 
       @doc false
@@ -928,10 +919,6 @@ defmodule Commanded.Event.Handler do
     Logger.debug(describe(state) <> " has successfully subscribed to event store")
 
     %Handler{handler_module: handler_module} = state
-
-    if function_exported?(handler_module, :init, 0) do
-      Logger.warning("#{inspect(handler_module)}.init/0 is deprecated, use after_start/1 instead")
-    end
 
     case handler_module.after_start(state.handler_state) do
       :ok ->

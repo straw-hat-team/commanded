@@ -2,7 +2,6 @@ defmodule Commanded.Event.HandlerAfterStartTest do
   use Commanded.MockEventStoreCase
 
   import Mox
-  import ExUnit.CaptureLog
 
   alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
 
@@ -13,47 +12,6 @@ defmodule Commanded.Event.HandlerAfterStartTest do
     end)
 
     :ok
-  end
-
-  describe "event handler `init/0` callback" do
-    # TODO: remove these test when we remove init/0
-
-    setup(%{test: test}) do
-      # HACK: generate a module that can communicate back to our test process
-      true = Process.register(self(), test)
-
-      Code.eval_string("""
-        defmodule DeprecatedHandler do
-          use Commanded.Event.Handler,
-            application: Commanded.MockedApp,
-            name: __MODULE__
-
-          @impl Commanded.Event.Handler
-          def init() do
-            process_name = :"#{test}"
-            Process.send(process_name, {:init, self()}, [])
-          end
-        end
-      """)
-
-      [handler: start_supervised!(DeprecatedHandler)]
-    end
-
-    test "should be called and a deprecation warning raised after handler subscribbed", %{
-      handler: handler
-    } do
-      warning =
-        capture_log([level: :warning], fn ->
-          # When the handler subscribes to the eventstore
-          send_subscribed(handler)
-
-          # Then we expect init/0 to have been called for us
-          assert_receive {:init, ^handler}
-        end)
-
-      # And we expect a deprecation warning to have been logged
-      assert warning =~ "DeprecatedHandler.init/0 is deprecated, use after_start/1 instead"
-    end
   end
 
   describe "event handler `after_start/1` callback" do

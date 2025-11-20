@@ -7,22 +7,27 @@ defmodule Commanded.ExampleDomain.BankAccount.BankAccountBatchHandler do
     start_from: :origin,
     batch_size: 3
 
+  alias Commanded.Event.Handler
   alias Commanded.ExampleDomain.BankAccount.Events.BankAccountOpened
 
-  def init do
+  @impl Handler
+  def after_start(_state) do
     case Agent.start_link(fn -> %{prefix: "", accounts: []} end, name: __MODULE__) do
       {:ok, _} -> :ok
       {:error, {:already_started, _}} -> :ok
-      _ -> {:error, :unable_to_start}
+      _ -> {:stop, :unable_to_start}
     end
   end
 
+  @impl Handler
   def before_reset do
     Agent.update(__MODULE__, fn state -> %{state | accounts: []} end)
   end
 
+  @impl Handler
   def handle_batch([]), do: :ok
 
+  @impl Handler
   def handle_batch([{%BankAccountOpened{} = event, _metadata} | rest]) do
     %BankAccountOpened{account_number: account_number} = event
 
