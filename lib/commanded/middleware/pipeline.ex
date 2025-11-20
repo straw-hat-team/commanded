@@ -9,7 +9,7 @@ defmodule Commanded.Middleware.Pipeline do
   ## Pipeline fields
 
     - `application` - the Commanded application.
-    
+
     - `assigns` - shared user data as a map.
 
     - `causation_id` - an optional UUID used to identify the cause of the
@@ -69,9 +69,9 @@ defmodule Commanded.Middleware.Pipeline do
   @doc """
   Puts the `key` with value equal to `value` into `metadata` map.
 
-  Note: Use of atom keys in metadata is deprecated in favour of binary strings.
+  The key must be a binary string.
   """
-  def assign_metadata(%Pipeline{} = pipeline, key, value) when is_binary(key) or is_atom(key) do
+  def assign_metadata(%Pipeline{} = pipeline, key, value) when is_binary(key) do
     %Pipeline{metadata: metadata} = pipeline
 
     %Pipeline{pipeline | metadata: Map.put(metadata, key, value)}

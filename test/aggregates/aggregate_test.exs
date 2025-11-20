@@ -38,12 +38,13 @@ defmodule Commanded.Aggregates.AggregateTest do
 
     test "ignore unexpected messages", %{pid: pid, ref: ref} do
       send_unexpected_mesage = fn ->
+        Logger.configure(level: :debug)
         send(pid, :unexpected_message)
 
         refute_receive {:DOWN, ^ref, :process, ^pid, _reason}
       end
 
-      captured = capture_log(send_unexpected_mesage)
+      captured = capture_log([level: :debug], send_unexpected_mesage)
 
       assert captured =~ "received unexpected message in handle_info/2: :unexpected_message"
     end

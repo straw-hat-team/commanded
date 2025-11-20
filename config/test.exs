@@ -3,8 +3,8 @@ import Config
 alias Commanded.EventStore.Adapters.InMemory
 alias Commanded.Serialization.JsonSerializer
 
-config :logger, level: :debug
-config :logger, :console, level: :debug, format: "[$level] $message\n"
+config :logger, level: :info
+config :logger, :console, level: :info, format: "[$level] $message\n"
 
 config :ex_unit,
   assert_receive_timeout: 1_000,
