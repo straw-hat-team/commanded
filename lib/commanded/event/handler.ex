@@ -929,7 +929,9 @@ defmodule Commanded.Event.Handler do
         {:noreply, new_state}
 
       {:stop, reason} ->
-        Logger.debug(describe(state) <> " `after_start/1` callback has requested to stop")
+        Logger.info(
+          describe(state) <> " `after_start/1` callback has requested to stop: #{inspect(reason)}"
+        )
 
         {:stop, reason, state}
     end
