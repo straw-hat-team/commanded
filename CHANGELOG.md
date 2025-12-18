@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.0.0](https://github.com/straw-hat-team/commanded/compare/v2.1.0...v3.0.0) (2025-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove deprecated init/0 callback and atom metadata key ([#35](https://github.com/straw-hat-team/commanded/issues/35))
+* remove deprecated project macros in Ecto projections ([#31](https://github.com/straw-hat-team/commanded/issues/31))
+* remove upcast ([#26](https://github.com/straw-hat-team/commanded/issues/26))
+* remove process manager ([#24](https://github.com/straw-hat-team/commanded/issues/24))
+
+### Features
+
+* add batch support to Ecto projections ([#30](https://github.com/straw-hat-team/commanded/issues/30)) ([0fb29d6](https://github.com/straw-hat-team/commanded/commit/0fb29d6e4213a87158e45e028f8b45e093d60ef0))
+* add Commanded.Projections.Ecto ([#27](https://github.com/straw-hat-team/commanded/issues/27)) ([d7bdcce](https://github.com/straw-hat-team/commanded/commit/d7bdcce33f32e61a1ec4ddfcb6decb24a81a995e))
+* add support for UUIDv7 generation and update command options to use UUIDv7 ([#22](https://github.com/straw-hat-team/commanded/issues/22)) ([bb29716](https://github.com/straw-hat-team/commanded/commit/bb297164b97e452b44d138ae3b412f26bd1d55c2))
+* implement timezone-aware timestamps for projections ([#32](https://github.com/straw-hat-team/commanded/issues/32)) ([af1bb2c](https://github.com/straw-hat-team/commanded/commit/af1bb2cb6651a0a1ea9b79142cb8a8413137981a))
+
+
+### Bug Fixes
+
+* add concurrency validation for Ecto projections ([#33](https://github.com/straw-hat-team/commanded/issues/33)) ([50ec412](https://github.com/straw-hat-team/commanded/commit/50ec4128f9d684bd33820b527e2320f7f788caff))
+* remove process manager ([#24](https://github.com/straw-hat-team/commanded/issues/24)) ([fbe7479](https://github.com/straw-hat-team/commanded/commit/fbe74793f4527f1f73f5beb0e6b08fc27b9049c1))
+* remove upcast ([#26](https://github.com/straw-hat-team/commanded/issues/26)) ([9d03039](https://github.com/straw-hat-team/commanded/commit/9d03039812ae934f2177f17e435ddbc59bb804ee))
+
+
+### Miscellaneous Chores
+
+* remove deprecated init/0 callback and atom metadata key ([#35](https://github.com/straw-hat-team/commanded/issues/35)) ([4762803](https://github.com/straw-hat-team/commanded/commit/47628032d9cba32bd21a07a5d6e424dea686e836))
+* remove deprecated project macros in Ecto projections ([#31](https://github.com/straw-hat-team/commanded/issues/31)) ([2c552e8](https://github.com/straw-hat-team/commanded/commit/2c552e80a6daa48b901f243263758c77c1410514))
+
 ## [2.1.0](https://github.com/straw-hat-team/commanded/compare/v2.0.0...v2.1.0) (2025-08-30)
 
 
