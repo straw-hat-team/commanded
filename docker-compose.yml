@@ -1,0 +1,17 @@
+name: commanded
+services:
+  eventstoredb:
+    image: eventstore/eventstore:23.10.0-bookworm-slim
+    ports:
+      - "2113:2113"
+    environment:
+      - EVENTSTORE_INSECURE=true
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2113/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

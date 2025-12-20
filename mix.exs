@@ -75,6 +75,7 @@ defmodule Commanded.Mixfile do
       {:jason, "~> 1.4", optional: true},
       {:phoenix_pubsub, "~> 2.1", optional: true},
       {:eventstore, "~> 1.4", optional: true},
+      {:spear, "~> 1.4", optional: true},
       {:ecto, "~> 3.11", optional: true},
       {:ecto_sql, "~> 3.11", optional: true},
 
@@ -139,6 +140,7 @@ defmodule Commanded.Mixfile do
           Commanded.EventStore,
           Commanded.EventStore.Adapter,
           Commanded.EventStore.Adapters.InMemory,
+          Commanded.EventStore.Adapters.KurrentDB,
           Commanded.EventStore.EventData,
           Commanded.EventStore.RecordedEvent,
           Commanded.EventStore.SnapshotData,
@@ -227,14 +229,14 @@ defmodule Commanded.Mixfile do
         "ecto.create",
         "ecto.migrate"
       ],
-      "test.all": ["test --include distributed --include eventstore_adapter"]
+      "test.all": ["test --include distributed --include eventstore_adapter --include kurrent_db"]
     ]
   end
 
   defp dialyzer do
     [
       ignore_warnings: ".dialyzer_ignore.exs",
-      plt_add_apps: [:ex_unit, :jason, :mix, :phoenix_pubsub, :ecto, :ecto_sql],
+      plt_add_apps: [:ex_unit, :jason, :mix, :phoenix_pubsub, :ecto, :ecto_sql, :spear],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/commanded.plt"}
     ]

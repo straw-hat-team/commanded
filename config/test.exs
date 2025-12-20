@@ -9,7 +9,7 @@ config :logger, :console, level: :info, format: "[$level] $message\n"
 config :ex_unit,
   assert_receive_timeout: 1_000,
   capture_log: [level: :debug],
-  exclude: [:distributed, :eventstore_adapter]
+  exclude: [:distributed, :eventstore_adapter, :kurrent_db]
 
 config :commanded,
   assert_receive_event_timeout: 100,

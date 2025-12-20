@@ -40,6 +40,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports: ["5432:5432"]
+      eventstoredb:
+        image: eventstore/eventstore:23.10.0-bookworm-slim
+        env:
+          EVENTSTORE_INSECURE: true
+          EVENTSTORE_RUN_PROJECTIONS: All
+          EVENTSTORE_START_STANDARD_PROJECTIONS: true
+          EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP: true
+        options: >-
+          --health-cmd "curl -f http://localhost:2113/health/live || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+        ports: ["2113:2113"]
     strategy:
       fail-fast: false
       matrix:
