@@ -27,6 +27,40 @@ if Code.ensure_loaded?(Spear) do
     Since EventStoreDB doesn't have native snapshot support, snapshots are stored
     as events in dedicated streams with the prefix `snapshot-`. For example,
     snapshots for aggregate `123` are stored in stream `snapshot-123`.
+
+    ## Persistent Subscriptions
+
+    Persistent subscriptions support native concurrency through EventStoreDB's
+    consumer groups. You can configure concurrency settings when subscribing:
+
+        Commanded.EventStore.subscribe_to(
+          :all,
+          "my-subscription",
+          MyHandler,
+          :origin,
+          max_subscriber_count: 5,
+          named_consumer_strategy: :RoundRobin
+        )
+
+    ### Subscription Options
+
+    * `max_subscriber_count` (integer, default: 1) - Maximum number of concurrent
+      consumers that can connect to the subscription. EventStoreDB will distribute
+      events across these consumers.
+
+    * `named_consumer_strategy` (atom, default: `:RoundRobin`) - Strategy for
+      distributing events to multiple consumers:
+      * `:RoundRobin` - Events are distributed evenly across all consumers
+      * `:Pinned` - Events from the same stream always go to the same consumer
+        (useful for maintaining ordering per stream)
+      * `:DispatchToSingle` - All events go to a single consumer
+
+    * `message_timeout` (integer, default: 5000) - Timeout in milliseconds before
+      a message is considered failed and re-delivered.
+
+    * `checkpoint_after` (integer, default: 3000) - Checkpoint interval in
+      milliseconds. The subscription will checkpoint after processing this many
+      events or after this duration.
     """
 
     @behaviour Commanded.EventStore.Adapter
@@ -283,6 +317,23 @@ if Code.ensure_loaded?(Spear) do
     defp start_from_to_position(:current), do: :end
     defp start_from_to_position(position) when is_integer(position), do: position
 
+    defp build_subscription_settings(opts) do
+      base = %Spear.PersistentSubscription.Settings{}
+
+      base
+      |> maybe_put_setting(opts, :max_subscriber_count)
+      |> maybe_put_setting(opts, :named_consumer_strategy)
+      |> maybe_put_setting(opts, :message_timeout)
+      |> maybe_put_setting(opts, :checkpoint_after)
+    end
+
+    defp maybe_put_setting(settings, opts, key) do
+      case Keyword.get(opts, key) do
+        nil -> settings
+        value -> Map.put(settings, key, value)
+      end
+    end
+
     defp subscribe_to_stream(
            adapter_meta,
            stream,
@@ -295,8 +346,8 @@ if Code.ensure_loaded?(Spear) do
 
       supervisor = subscriptions_supervisor_name(name)
 
-      # Ensure persistent subscription exists (create if not exists)
-      settings = %Spear.PersistentSubscription.Settings{}
+      # Build settings from opts to support native concurrency
+      settings = build_subscription_settings(opts)
       from_position = start_from_to_position(start_from)
 
       # Try to create the subscription - may fail if already exists

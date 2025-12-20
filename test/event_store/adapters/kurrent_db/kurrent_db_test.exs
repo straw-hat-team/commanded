@@ -297,6 +297,131 @@ defmodule Commanded.EventStore.Adapters.KurrentDB.KurrentDBTest do
     end
   end
 
+  describe "concurrency settings" do
+    test "should create subscription with max_subscriber_count", %{
+      event_store_meta: event_store_meta
+    } do
+      stream_uuid = "test-stream-#{UUID.uuid4()}"
+      subscription_name = "test-subscription-#{UUID.uuid4()}"
+
+      # Create stream first
+      events = build_events(1)
+      assert :ok == KurrentDB.append_to_stream(event_store_meta, stream_uuid, 0, events)
+
+      # Subscribe with max_subscriber_count
+      {:ok, subscription} =
+        KurrentDB.subscribe_to(
+          event_store_meta,
+          stream_uuid,
+          subscription_name,
+          self(),
+          :origin,
+          max_subscriber_count: 5
+        )
+
+      assert is_pid(subscription)
+
+      # Cleanup
+      :ok = KurrentDB.unsubscribe(event_store_meta, subscription)
+      Process.sleep(200)
+      # Delete may fail if connection is closed, which is acceptable
+      _ = KurrentDB.delete_subscription(event_store_meta, stream_uuid, subscription_name)
+    end
+
+    test "should create subscription with named_consumer_strategy", %{
+      event_store_meta: event_store_meta
+    } do
+      stream_uuid = "test-stream-#{UUID.uuid4()}"
+      subscription_name = "test-subscription-#{UUID.uuid4()}"
+
+      # Create stream first
+      events = build_events(1)
+      assert :ok == KurrentDB.append_to_stream(event_store_meta, stream_uuid, 0, events)
+
+      # Subscribe with Pinned strategy
+      {:ok, subscription} =
+        KurrentDB.subscribe_to(
+          event_store_meta,
+          stream_uuid,
+          subscription_name,
+          self(),
+          :origin,
+          named_consumer_strategy: :Pinned
+        )
+
+      assert is_pid(subscription)
+
+      # Cleanup
+      :ok = KurrentDB.unsubscribe(event_store_meta, subscription)
+      Process.sleep(200)
+      # Delete may fail if connection is closed, which is acceptable
+      _ = KurrentDB.delete_subscription(event_store_meta, stream_uuid, subscription_name)
+    end
+
+    test "should create subscription with RoundRobin strategy", %{
+      event_store_meta: event_store_meta
+    } do
+      stream_uuid = "test-stream-#{UUID.uuid4()}"
+      subscription_name = "test-subscription-#{UUID.uuid4()}"
+
+      # Create stream first
+      events = build_events(1)
+      assert :ok == KurrentDB.append_to_stream(event_store_meta, stream_uuid, 0, events)
+
+      # Subscribe with RoundRobin strategy
+      {:ok, subscription} =
+        KurrentDB.subscribe_to(
+          event_store_meta,
+          stream_uuid,
+          subscription_name,
+          self(),
+          :origin,
+          named_consumer_strategy: :RoundRobin
+        )
+
+      assert is_pid(subscription)
+
+      # Cleanup
+      :ok = KurrentDB.unsubscribe(event_store_meta, subscription)
+      Process.sleep(200)
+      # Delete may fail if connection is closed, which is acceptable
+      _ = KurrentDB.delete_subscription(event_store_meta, stream_uuid, subscription_name)
+    end
+
+    test "should create subscription with all concurrency options", %{
+      event_store_meta: event_store_meta
+    } do
+      stream_uuid = "test-stream-#{UUID.uuid4()}"
+      subscription_name = "test-subscription-#{UUID.uuid4()}"
+
+      # Create stream first
+      events = build_events(1)
+      assert :ok == KurrentDB.append_to_stream(event_store_meta, stream_uuid, 0, events)
+
+      # Subscribe with all options
+      {:ok, subscription} =
+        KurrentDB.subscribe_to(
+          event_store_meta,
+          stream_uuid,
+          subscription_name,
+          self(),
+          :origin,
+          max_subscriber_count: 3,
+          named_consumer_strategy: :RoundRobin,
+          message_timeout: 10_000,
+          checkpoint_after: 5_000
+        )
+
+      assert is_pid(subscription)
+
+      # Cleanup
+      :ok = KurrentDB.unsubscribe(event_store_meta, subscription)
+      Process.sleep(200)
+      # Delete may fail if connection is closed, which is acceptable
+      _ = KurrentDB.delete_subscription(event_store_meta, stream_uuid, subscription_name)
+    end
+  end
+
   describe "snapshots" do
     test "should record and read snapshot", %{event_store_meta: event_store_meta} do
       source_uuid = "aggregate-#{UUID.uuid4()}"
