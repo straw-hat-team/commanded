@@ -41,7 +41,14 @@ if Code.ensure_loaded?(:otel_propagator_text_map) do
 
     alias Commanded.Middleware.Pipeline
 
-    @doc false
+    @doc """
+    Injects W3C trace context headers into the command pipeline metadata.
+
+    Called before command dispatch to capture the current span context.
+    If a span is active, it injects `traceparent` and optionally `tracestate`
+    into the pipeline's assigned metadata.
+    """
+    @impl true
     def before_dispatch(%Pipeline{} = pipeline) do
       case :otel_propagator_text_map.inject([]) do
         [] ->
@@ -59,8 +66,12 @@ if Code.ensure_loaded?(:otel_propagator_text_map) do
     defp maybe_assign(pipeline, key, {_, value}),
       do: Pipeline.assign_metadata(pipeline, key, value)
 
+    @doc false
+    @impl true
     def after_dispatch(pipeline), do: pipeline
 
+    @doc false
+    @impl true
     def after_failure(pipeline), do: pipeline
   end
 end

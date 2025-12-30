@@ -67,10 +67,16 @@ defmodule Commanded.Mixfile do
     [
       {:backoff, "~> 1.1"},
       {:uniq, "~> 0.6.1"},
+      {:nimble_options, "~> 1.0"},
 
       # Telemetry
       {:telemetry, "~> 0.4 or ~> 1.0"},
       {:telemetry_registry, "~> 0.2 or ~> 0.3"},
+
+      # OpenTelemetry (required for distributed tracing)
+      {:opentelemetry_api, "~> 1.0"},
+      {:opentelemetry_telemetry, "~> 1.0"},
+      {:opentelemetry_semantic_conventions, "~> 1.27"},
 
       # Optional dependencies
       {:jason, "~> 1.4", optional: true},
@@ -78,7 +84,6 @@ defmodule Commanded.Mixfile do
       {:eventstore, "~> 1.4", optional: true},
       {:ecto, "~> 3.11", optional: true},
       {:ecto_sql, "~> 3.11", optional: true},
-      {:opentelemetry_api, "~> 1.0", optional: true},
 
       # Build and test tools
       {:benchfella, "~> 0.3", only: :bench},
@@ -181,6 +186,11 @@ defmodule Commanded.Mixfile do
         Testing: [
           Commanded.AggregateCase,
           Commanded.Assertions.EventAssertions
+        ],
+        OpenTelemetry: [
+          Commanded.OpenTelemetry,
+          Commanded.OpenTelemetry.CommandedAttributes,
+          Commanded.Middleware.TraceContextPropagator
         ]
       ],
       nest_modules_by_prefix: [
@@ -189,6 +199,7 @@ defmodule Commanded.Mixfile do
         Commanded.Commands,
         Commanded.Event,
         Commanded.EventStore,
+        Commanded.OpenTelemetry,
         Commanded.PubSub,
         Commanded.Projections,
         Commanded.Registration,
@@ -245,7 +256,8 @@ defmodule Commanded.Mixfile do
         :phoenix_pubsub,
         :ecto,
         :ecto_sql,
-        :opentelemetry_api
+        :opentelemetry_api,
+        :opentelemetry_telemetry
       ],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/commanded.plt"}

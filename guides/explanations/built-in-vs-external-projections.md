@@ -2,8 +2,6 @@
 
 This document explains the differences between Commanded's built-in Ecto projections and the external `commanded-ecto-projections` package, helping you understand the design decisions and trade-offs.
 
-**See also:** [How to Migrate Guide](../howtos/migrating-from-commanded-ecto-projections.md)
-
 ## Why Built-in Support Exists
 
 The `commanded-ecto-projections` package was originally created as an external library to provide Ecto integration for Commanded. In version 1.4, this functionality was integrated directly into Commanded core for several reasons:
@@ -344,7 +342,6 @@ The external package will remain available for legacy projects but won't receive
 
 ## Further Reading
 
-- [How to Migrate from External Package](../howtos/migrating-from-commanded-ecto-projections.md)
 - [Ecto Projections Architecture](ecto-projections.md)
 - [Why Concurrency Is Not Supported](ecto-projections.md#why-concurrency-is-not-supported)
 - [Building Read Models with Batch Processing](../howtos/building-read-models-with-ecto.md#use-batch-processing-for-high-throughput)
