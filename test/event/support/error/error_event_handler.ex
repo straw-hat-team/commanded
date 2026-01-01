@@ -67,7 +67,7 @@ defmodule Commanded.Event.ErrorEventHandler do
   def error(
         {:error, :failed},
         %ErrorEvent{strategy: "retry_failure_context"} = event,
-        failure_context
+        %FailureContext{} = failure_context
       ) do
     %ErrorEvent{delay: delay, reply_to: reply_to} = event
     %FailureContext{context: context} = failure_context
@@ -78,7 +78,7 @@ defmodule Commanded.Event.ErrorEventHandler do
       |> Map.put(:delay, delay)
 
     # Record failure count in context map
-    failure_context = %FailureContext{failure_context | context: context}
+    failure_context = %{failure_context | context: context}
 
     if Map.get(context, :failures) >= 3 do
       # Stop error handler after third failure

@@ -20,8 +20,17 @@ defmodule Commanded.Mixfile do
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() == :prod,
       dialyzer: dialyzer(),
-      source_url: @source_url,
-      preferred_cli_env: preferred_cli_env()
+      source_url: @source_url
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        setup: :test,
+        reset: :test,
+        "test.all": :test
+      ]
     ]
   end
 
@@ -29,14 +38,6 @@ defmodule Commanded.Mixfile do
     [
       extra_applications: extra_applications(Mix.env()),
       mod: {Commanded, []}
-    ]
-  end
-
-  defp preferred_cli_env do
-    [
-      setup: :test,
-      reset: :test,
-      "test.all": :test
     ]
   end
 
