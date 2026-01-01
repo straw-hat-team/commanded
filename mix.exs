@@ -77,6 +77,7 @@ defmodule Commanded.Mixfile do
       {:eventstore, "~> 1.4", optional: true},
       {:ecto, "~> 3.11", optional: true},
       {:ecto_sql, "~> 3.11", optional: true},
+      {:opentelemetry_api, "~> 1.0", optional: true},
 
       # Build and test tools
       {:benchfella, "~> 0.3", only: :bench},
@@ -85,7 +86,9 @@ defmodule Commanded.Mixfile do
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:local_cluster, "~> 2.1", only: :test, runtime: false},
       {:mix_test_watch, "~> 1.1", only: :dev},
-      {:mox, "~> 1.0", only: [:bench, :test]}
+      {:mox, "~> 1.0", only: [:bench, :test]},
+      {:opentelemetry, "~> 1.0", only: :test},
+      {:opentelemetry_exporter, "~> 1.0", only: :test}
     ]
   end
 
@@ -234,7 +237,15 @@ defmodule Commanded.Mixfile do
   defp dialyzer do
     [
       ignore_warnings: ".dialyzer_ignore.exs",
-      plt_add_apps: [:ex_unit, :jason, :mix, :phoenix_pubsub, :ecto, :ecto_sql],
+      plt_add_apps: [
+        :ex_unit,
+        :jason,
+        :mix,
+        :phoenix_pubsub,
+        :ecto,
+        :ecto_sql,
+        :opentelemetry_api
+      ],
       plt_add_deps: :app_tree,
       plt_file: {:no_warn, "priv/plts/commanded.plt"}
     ]
