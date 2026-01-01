@@ -146,3 +146,28 @@ defmodule MyApp.Repo.Migrations.UpgradeProjectionVersionsTimestamps do
   end
 end
 ```
+
+### **W3C Trace Context Propagation Middleware**
+[PR #38](https://github.com/straw-hat-team/commanded/pull/38)
+
+**Changes:**
+- Added `Commanded.Middleware.TraceContextPropagator` middleware for propagating OpenTelemetry trace context
+- Captures current span context and stores it in event metadata using W3C Trace Context standard
+- Added `opentelemetry_api` as optional dependency
+
+**Usage:**
+```elixir
+defmodule MyApp.Router do
+  use Commanded.Commands.Router
+
+  middleware Commanded.Middleware.TraceContextPropagator
+
+  # ... your command routes
+end
+```
+
+**Benefits:**
+- Enables distributed tracing correlation between command dispatch and event handlers
+- Uses standard W3C `traceparent` and `tracestate` headers stored in event metadata
+- Event handlers can extract trace context to create span links or parent-child relationships
+- Non-invasive - only adds metadata when a span is active
