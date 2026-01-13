@@ -159,16 +159,16 @@ The prefix is used as the stream identity when appending, and reading, the aggre
 
 #### Custom aggregate identity
 
-Any module that implements the `String.Chars` protocol can be used for an aggregate's identity. By default this includes the following Elixir built-in types: strings, integers, floats, atoms, and lists.
+Any module that implements the `Commanded.Aggregate.Identity` protocol can be used for an aggregate's identity. By default this falls back to the `String.Chars` protocol, which includes the following Elixir built-in types: strings, integers, floats, atoms, and lists.
 
-You can define your own custom identity modules and implement the `String.Chars` protocol for them:
+You can define your own custom identity modules and implement the `Commanded.Aggregate.Identity` protocol for them:
 
 ```elixir
 defmodule AccountNumber do
   defstruct [:branch, :account_number]
 
-  defimpl String.Chars do
-    def to_string(%AccountNumber{branch: branch, account_number: account_number}),
+  defimpl Commanded.Aggregate.Identity do
+    def to_stream_id(%AccountNumber{branch: branch, account_number: account_number}),
       do: branch <> ":" <> account_number
   end
 end
@@ -184,6 +184,10 @@ open_account = %OpenAccount{
 
 :ok = BankApp.dispatch(open_account)
 ```
+
+> #### Note {: .info}
+>
+> For backwards compatibility, if `Commanded.Aggregate.Identity` is not implemented for a type, it will fall back to using the `String.Chars` protocol.
 
 ### Timeouts
 

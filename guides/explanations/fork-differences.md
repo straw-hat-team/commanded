@@ -171,3 +171,48 @@ end
 - Uses standard W3C `traceparent` and `tracestate` headers stored in event metadata
 - Event handlers can extract trace context to create span links or parent-child relationships
 - Non-invasive - only adds metadata when a span is active
+
+### **Aggregate Identity Protocol**
+[PR #43](https://github.com/straw-hat-team/commanded/pull/43)
+
+**Changes:**
+- Added `Commanded.Aggregate.Identity` protocol for converting aggregate identities to stream ID strings
+- Protocol uses `@fallback_to_any true` with default implementation delegating to `String.Chars`
+- Updated `ExtractAggregateIdentity` middleware to use the new protocol
+
+**Usage:**
+```elixir
+defmodule AccountNumber do
+  defstruct [:branch, :account_number]
+
+  defimpl Commanded.Aggregate.Identity do
+    def to_stream_id(%AccountNumber{branch: branch, account_number: account_number}),
+      do: branch <> ":" <> account_number
+  end
+end
+```
+
+**Benefits:**
+- Provides a dedicated protocol for aggregate identity conversion with clear semantics
+- Backwards compatible - falls back to `String.Chars` for existing implementations
+- Avoids conflict with `String.Chars` which is a general-purpose protocol used for many purposes (logging, display, string interpolation, etc.) where the desired format may differ from the stream ID format
+
+**Rationale:**
+
+The `String.Chars` protocol is commonly implemented for various purposes unrelated to aggregate identity. For example, you might use it to format a value for API responses:
+
+```elixir
+# String.Chars for API response formatting
+defimpl String.Chars, for: AccountNumber do
+  def to_string(%AccountNumber{branch: branch, account_number: account_number}),
+    do: "#{branch}/#{account_number}"
+end
+
+# But need a different format for stream IDs in storage
+defimpl Commanded.Aggregate.Identity, for: AccountNumber do
+  def to_stream_id(%AccountNumber{branch: branch, account_number: account_number}),
+    do: "#{branch}:#{account_number}"
+end
+```
+
+With a dedicated protocol, the API response format and the event store stream ID format are properly separated and can evolve independently.
