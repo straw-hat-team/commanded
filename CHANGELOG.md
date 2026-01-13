@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.0](https://github.com/straw-hat-team/commanded/compare/v3.0.0...v3.1.0) (2026-01-13)
+
+
+### Features
+
+* add aggregate identity handling to use `Commanded.Aggregate.Identity` protocol ([#43](https://github.com/straw-hat-team/commanded/issues/43)) ([a0eb2cb](https://github.com/straw-hat-team/commanded/commit/a0eb2cb982958bad29d6905af3ad4e477efa05fb))
+* add W3C Trace Context propagation middleware for OpenTelemetry ([#38](https://github.com/straw-hat-team/commanded/issues/38)) ([b6c3e0b](https://github.com/straw-hat-team/commanded/commit/b6c3e0b830a0572748134fa81de9ce5447364dd1))
+
 ## [3.0.0](https://github.com/straw-hat-team/commanded/compare/v2.1.0...v3.0.0) (2025-11-21)
 
 
