@@ -6,6 +6,7 @@ defmodule Commanded.Middleware.ExtractAggregateIdentity do
 
   @behaviour Commanded.Middleware
 
+  alias Commanded.Aggregate.Identity
   alias Commanded.Middleware.Pipeline
   import Pipeline
 
@@ -45,10 +46,10 @@ defmodule Commanded.Middleware.ExtractAggregateIdentity do
 
   defp extract_aggregate_uuid(%Pipeline{}), do: {:error, :invalid_aggregate_identity}
 
-  # Attempt to convert the aggregate identity to a string via the `String.Chars` protocol.
+  # Convert the aggregate identity to a string via the `Commanded.Aggregate.Identity` protocol.
   defp identity_to_string(aggregate_uuid) do
     try do
-      to_string(aggregate_uuid)
+      Identity.to_stream_id(aggregate_uuid)
     rescue
       Protocol.UndefinedError ->
         {:error, {:unsupported_aggregate_identity_type, aggregate_uuid}}
