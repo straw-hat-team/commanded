@@ -216,3 +216,30 @@ end
 ```
 
 With a dedicated protocol, the API response format and the event store stream ID format are properly separated and can evolve independently.
+
+### **OpenTelemetry Integration**
+[PR #41](https://github.com/straw-hat-team/commanded/pull/41)
+
+**Changes:**
+- Added `Commanded.OpenTelemetry` module for distributed tracing
+- Creates spans for event handler and batch event processing
+- Added `opentelemetry_api`, `opentelemetry_telemetry`, and `opentelemetry_semantic_conventions` as required dependencies
+
+**Usage:**
+```elixir
+defmodule MyApp.Application do
+  use Application
+
+  def start(_type, _args) do
+    Commanded.OpenTelemetry.setup()
+
+    children = [MyApp.CommandedApp]
+    Supervisor.start_link(children, strategy: :one_for_one)
+  end
+end
+```
+
+**Benefits:**
+- Visualize event handler execution in your tracing backend
+- Correlate event processing with command dispatch using span links
+- Configurable span relationships (`:link`, `:child`, `:none`)
