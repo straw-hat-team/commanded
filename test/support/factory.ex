@@ -1,4 +1,5 @@
 defmodule Commanded.TestSupport.Factory do
+  alias Commanded.Aggregates.ExecutionContext
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.TestSupport.TestDomain
   alias Commanded.UUID
@@ -482,6 +483,59 @@ defmodule Commanded.TestSupport.Factory do
     )
   end
 
+  def build_application_dispatch_metadata(opts \\ []) do
+    causation_id = Keyword.get(opts, :causation_id, UUID.uuid4())
+    correlation_id = Keyword.get(opts, :correlation_id, UUID.uuid4())
+
+    command =
+      Keyword.get_lazy(opts, :command, fn ->
+        build_open_account()
+      end)
+
+    execution_context =
+      Keyword.get_lazy(opts, :execution_context, fn ->
+        %ExecutionContext{
+          command: command,
+          causation_id: causation_id,
+          correlation_id: correlation_id,
+          handler: Keyword.get(opts, :handler, TestDomain.Account),
+          function: Keyword.get(opts, :function, :execute),
+          metadata: Keyword.get(opts, :metadata, %{})
+        }
+      end)
+
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      execution_context: execution_context
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      execution_context: Keyword.fetch!(opts, :execution_context),
+      error: nil
+    }
+  end
+
+  def build_application_dispatch_stop_metadata(opts \\ []) do
+    base = build_application_dispatch_metadata(opts)
+
+    Map.merge(base, %{
+      error: Keyword.get(opts, :error, nil)
+    })
+  end
+
+  def build_application_dispatch_exception_metadata(opts \\ []) do
+    base = build_application_dispatch_metadata(opts)
+
+    Map.merge(base, %{
+      kind: Keyword.get(opts, :kind, :error),
+      reason: Keyword.get(opts, :reason, %RuntimeError{message: "Test error"}),
+      stacktrace: Keyword.get(opts, :stacktrace, [])
+    })
+  end
+
   def build_aggregate_execute_metadata(opts \\ []) do
     aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
 
@@ -604,6 +658,30 @@ defmodule Commanded.TestSupport.Factory do
     measurements = build_telemetry_exception_measurements()
     metadata = build_aggregate_execute_exception_metadata(opts)
     event_name = [:commanded, :aggregate, :execute, :exception]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:application_dispatch_start, opts) do
+    measurements = build_telemetry_start_measurements()
+    metadata = build_application_dispatch_metadata(opts)
+    event_name = [:commanded, :application, :dispatch, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:application_dispatch_stop, opts) do
+    measurements = build_telemetry_stop_measurements()
+    metadata = build_application_dispatch_stop_metadata(opts)
+    event_name = [:commanded, :application, :dispatch, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:application_dispatch_exception, opts) do
+    measurements = build_telemetry_exception_measurements()
+    metadata = build_application_dispatch_exception_metadata(opts)
+    event_name = [:commanded, :application, :dispatch, :exception]
 
     {event_name, measurements, metadata}
   end
