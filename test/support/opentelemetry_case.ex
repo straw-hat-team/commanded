@@ -41,7 +41,10 @@ defmodule Commanded.OpenTelemetryCase do
         [:commanded, :event, :handle, :exception],
         [:commanded, :event, :batch, :start],
         [:commanded, :event, :batch, :stop],
-        [:commanded, :event, :batch, :exception]
+        [:commanded, :event, :batch, :exception],
+        [:commanded, :aggregate, :execute, :start],
+        [:commanded, :aggregate, :execute, :stop],
+        [:commanded, :aggregate, :execute, :exception]
       ]
 
       for event <- commanded_events,

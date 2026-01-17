@@ -56,14 +56,11 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     test "calling setup twice raises MatchError (fail fast)" do
       detach_handlers()
 
-      # First call succeeds
       :ok = EventHandler.setup()
 
-      # Verify handlers are attached
       handlers = :telemetry.list_handlers([:commanded, :event, :handle, :start])
       assert length(handlers) == 1
 
-      # Second call raises because handlers already exist
       assert_raise MatchError, fn ->
         EventHandler.setup()
       end
@@ -78,32 +75,13 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     end
 
     test "includes ALL required span attributes" do
-      event_id = Commanded.UUID.uuid4()
-      aggregate_uuid = Commanded.UUID.uuid4()
-      causation_id = Commanded.UUID.uuid4()
-      correlation_id = Commanded.UUID.uuid4()
-
-      recorded_event =
-        Factory.build_recorded_event(
-          event_id: event_id,
-          event_number: 42,
-          stream_id: "BankAccount-#{aggregate_uuid}",
-          stream_version: 7,
-          causation_id: causation_id,
-          correlation_id: correlation_id,
-          event_type: "Elixir.MyApp.Events.AccountOpened",
-          data: %{account_number: "ACC-001", initial_balance: 1000},
-          metadata: %{}
-        )
-
       meta =
-        Factory.build_event_handler_metadata(
-          application: MyApp.CommandedApp,
-          handler_name: "MyApp.Projectors.AccountProjector",
-          handler_module: MyApp.Projectors.AccountProjector,
-          handler_state: %{},
-          recorded_event: recorded_event
+        Factory.build_event_handler_metadata(:account_projector,
+          event_number: 42,
+          stream_version: 7
         )
+
+      recorded_event = meta.recorded_event
 
       :telemetry.span([:commanded, :event, :handle], meta, fn ->
         {:ok, meta}
@@ -111,57 +89,36 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         kind: :consumer,
+                        status: status,
                         attributes: attributes
                       )},
                      1000
 
-      attrs = :otel_attributes.map(attributes)
+      assert status == :undefined
 
-      # OTel Messaging SemConv
-      assert attrs[:"messaging.system"] == "commanded"
-      assert attrs[:"messaging.operation.type"] == :receive
-      assert attrs[:"messaging.operation.name"] == "handle"
-      assert attrs[:"messaging.destination.name"] == "MyApp.Projectors.AccountProjector"
-
-      assert attrs[:"messaging.destination.subscription.name"] ==
-               "MyApp.Projectors.AccountProjector"
-
-      assert attrs[:"messaging.message.id"] == event_id
-      assert attrs[:"messaging.message.conversation_id"] == correlation_id
-      assert attrs[:"messaging.consumer.group.name"] == MyApp.CommandedApp
-
-      # OTel Code SemConv
-      assert attrs[:"code.function"] == "handle"
-      assert attrs[:"code.namespace"] == "MyApp.Projectors.AccountProjector"
-
-      # Commanded-specific
-      assert attrs[:"commanded.application"] == MyApp.CommandedApp
-      assert attrs[:"commanded.event"] == "Elixir.MyApp.Events.AccountOpened"
-      assert attrs[:"commanded.event.number"] == 42
-      assert attrs[:"commanded.correlation_id"] == correlation_id
-      assert attrs[:"commanded.causation_id"] == causation_id
-      assert attrs[:"commanded.handler.name"] == "MyApp.Projectors.AccountProjector"
-      assert attrs[:"commanded.stream.id"] == "BankAccount-#{aggregate_uuid}"
-      assert attrs[:"commanded.stream.version"] == 7
-      assert attrs[:"commanded.handler.kind"] == "event_handler"
-    end
-
-    test "span has unset/ok status on successful handling" do
-      recorded_event = build_recorded_event("success-test")
-      meta = build_meta(recorded_event)
-
-      :telemetry.span([:commanded, :event, :handle], meta, fn ->
-        {:ok, meta}
-      end)
-
-      assert_receive {:span,
-                      span(name: "MyApp.Projectors.AccountProjector receive", status: status)},
-                     1000
-
-      # Status should be :unset (default) for success, not :error
-      assert status == :undefined or match?({:status, :unset, _}, status)
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": "MyApp.Projectors.AccountProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.AccountProjector",
+               "messaging.message.id": recorded_event.event_id,
+               "messaging.message.conversation_id": recorded_event.correlation_id,
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "code.function": "handle",
+               "code.namespace": "MyApp.Projectors.AccountProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.event": "Elixir.MyApp.Events.AccountOpened",
+               "commanded.event.number": 42,
+               "commanded.correlation_id": recorded_event.correlation_id,
+               "commanded.causation_id": recorded_event.causation_id,
+               "commanded.handler.name": "MyApp.Projectors.AccountProjector",
+               "commanded.stream.id": recorded_event.stream_id,
+               "commanded.stream.version": 7,
+               "commanded.handler.kind": "event_handler"
+             }
     end
   end
 
@@ -177,15 +134,10 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
       last_event_id = Commanded.UUID.uuid4()
 
       meta =
-        Factory.build_batch_handler_metadata(
-          application: MyApp.CommandedApp,
-          handler_name: "MyApp.Projectors.TransactionProjector",
-          handler_module: MyApp.Projectors.TransactionProjector,
-          handler_state: %{processed_count: 0},
+        Factory.build_batch_handler_metadata(:transaction_projector,
           first_event_id: first_event_id,
           last_event_id: last_event_id,
-          event_count: 100,
-          recorded_event: nil
+          event_count: 100
         )
 
       :telemetry.span([:commanded, :event, :batch], meta, fn ->
@@ -194,7 +146,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
+                        name: "batch MyApp.Projectors.TransactionProjector",
                         kind: :consumer,
                         attributes: attributes
                       )},
@@ -202,29 +154,23 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       attrs = :otel_attributes.map(attributes)
 
-      # OTel Messaging SemConv
-      assert attrs[:"messaging.system"] == "commanded"
-      assert attrs[:"messaging.operation.type"] == :receive
-      assert attrs[:"messaging.operation.name"] == "batch"
-      assert attrs[:"messaging.destination.name"] == "MyApp.Projectors.TransactionProjector"
-
-      assert attrs[:"messaging.destination.subscription.name"] ==
-               "MyApp.Projectors.TransactionProjector"
-
-      assert attrs[:"messaging.consumer.group.name"] == MyApp.CommandedApp
-      assert attrs[:"messaging.batch.message_count"] == 100
-
-      # OTel Code SemConv
-      assert attrs[:"code.function"] == "handle_batch"
-      assert attrs[:"code.namespace"] == "MyApp.Projectors.TransactionProjector"
-
-      # Commanded-specific
-      assert attrs[:"commanded.application"] == MyApp.CommandedApp
-      assert attrs[:"commanded.handler.name"] == "MyApp.Projectors.TransactionProjector"
-      assert attrs[:"commanded.event.count"] == 100
-      assert attrs[:"commanded.handler.kind"] == "event_handler"
-      assert attrs[:"commanded.batch.first_event_id"] == first_event_id
-      assert attrs[:"commanded.batch.last_event_id"] == last_event_id
+      assert attrs == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "batch",
+               "messaging.destination.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "messaging.batch.message_count": 100,
+               "code.function": "handle_batch",
+               "code.namespace": "MyApp.Projectors.TransactionProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.handler.name": "MyApp.Projectors.TransactionProjector",
+               "commanded.event.count": 100,
+               "commanded.handler.kind": "event_handler",
+               "commanded.batch.first_event_id": first_event_id,
+               "commanded.batch.last_event_id": last_event_id
+             }
     end
   end
 
@@ -236,68 +182,91 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     end
 
     test "sets error status with error message when handler returns error" do
-      recorded_event = build_recorded_event("error-test")
-      meta = build_meta(recorded_event)
+      meta = Factory.build_event_handler_metadata(:account_projector)
+      recorded_event = meta.recorded_event
 
       :telemetry.execute([:commanded, :event, :handle, :start], %{}, meta)
 
-      # Commanded stores only the reason, not the full {:error, reason} tuple
-      # See: lib/commanded/event/handler.ex line 1073
+      # Commanded emits only the reason atom, not {:error, reason} tuple
       stop_meta = Map.put(meta, :error, :unique_constraint_violation)
       :telemetry.execute([:commanded, :event, :handle, :stop], %{duration: 1000}, stop_meta)
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         status: {:status, :error, error_message},
                         attributes: span_attrs
                       )},
                      1000
 
-      # Error message should contain the error reason
-      assert error_message =~ "unique_constraint_violation"
+      # Atom errors are formatted via inspect()
+      assert error_message == ":unique_constraint_violation"
 
-      # Verify error.type SemConv attribute is set
-      attrs = :otel_attributes.map(span_attrs)
-      assert attrs[:"error.type"] == "unique_constraint_violation"
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": "MyApp.Projectors.AccountProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.AccountProjector",
+               "messaging.message.id": recorded_event.event_id,
+               "messaging.message.conversation_id": recorded_event.correlation_id,
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "code.function": "handle",
+               "code.namespace": "MyApp.Projectors.AccountProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.event": "Elixir.MyApp.Events.AccountOpened",
+               "commanded.event.number": recorded_event.event_number,
+               "commanded.correlation_id": recorded_event.correlation_id,
+               "commanded.causation_id": recorded_event.causation_id,
+               "commanded.handler.name": "MyApp.Projectors.AccountProjector",
+               "commanded.stream.id": recorded_event.stream_id,
+               "commanded.stream.version": recorded_event.stream_version,
+               "commanded.handler.kind": "event_handler",
+               "error.type": "unique_constraint_violation"
+             }
     end
 
     test "records exception event with type, message, and stacktrace" do
-      recorded_event = build_recorded_event("exception-test")
-      meta = build_meta(recorded_event)
+      meta =
+        Factory.build_exception_metadata(:account_projector)
+
+      recorded_event = meta.recorded_event
 
       :telemetry.execute([:commanded, :event, :handle, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :error,
-          reason: %KeyError{key: :account_number, term: %{balance: 100}},
-          stacktrace: [
-            {MyApp.Projectors.AccountProjector, :handle, 2,
-             [file: ~c"lib/my_app/projectors/account_projector.ex", line: 45]},
-            {Commanded.Event.Handler, :delegate_event_to_handler, 2,
-             [file: ~c"lib/commanded/event/handler.ex", line: 1192]}
-          ]
-        })
-
-      :telemetry.execute(
-        [:commanded, :event, :handle, :exception],
-        %{duration: 500},
-        exception_meta
-      )
+      :telemetry.execute([:commanded, :event, :handle, :exception], %{duration: 500}, meta)
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         status: {:status, :error, _},
                         attributes: span_attrs,
                         events: events
                       )},
                      1000
 
-      # Verify error.type SemConv attribute is set on the span
-      attrs = :otel_attributes.map(span_attrs)
-      assert attrs[:"error.type"] == "Elixir.KeyError"
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": "MyApp.Projectors.AccountProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.AccountProjector",
+               "messaging.message.id": recorded_event.event_id,
+               "messaging.message.conversation_id": recorded_event.correlation_id,
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "code.function": "handle",
+               "code.namespace": "MyApp.Projectors.AccountProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.event": "Elixir.MyApp.Events.AccountOpened",
+               "commanded.event.number": recorded_event.event_number,
+               "commanded.correlation_id": recorded_event.correlation_id,
+               "commanded.causation_id": recorded_event.causation_id,
+               "commanded.handler.name": "MyApp.Projectors.AccountProjector",
+               "commanded.stream.id": recorded_event.stream_id,
+               "commanded.stream.version": recorded_event.stream_version,
+               "commanded.handler.kind": "event_handler",
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.KeyError"
+             }
 
       events_list = :otel_events.list(events)
       [exception_event] = Enum.filter(events_list, fn event(name: n) -> n == :exception end)
@@ -306,70 +275,117 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       exc_attrs_map = :otel_attributes.map(exc_attrs)
 
-      assert Map.has_key?(exc_attrs_map, "exception.type") or
-               Map.has_key?(exc_attrs_map, :"exception.type")
+      assert map_size(exc_attrs_map) == 3
+      assert exc_attrs_map[:"exception.type"] == "Elixir.KeyError"
 
-      assert Map.has_key?(exc_attrs_map, "exception.message") or
-               Map.has_key?(exc_attrs_map, :"exception.message")
+      assert exc_attrs_map[:"exception.message"] ==
+               "key :account_number not found in:\n\n    %{balance: 100}\n"
 
-      assert Map.has_key?(exc_attrs_map, "exception.stacktrace") or
-               Map.has_key?(exc_attrs_map, :"exception.stacktrace")
+      # Version number in stacktrace changes per release
+      stacktrace = exc_attrs_map[:"exception.stacktrace"]
+      {:ok, commanded_version} = :application.get_key(:commanded, :vsn)
+
+      expected_stacktrace =
+        "    lib/my_app/projectors/account_projector.ex:45: MyApp.Projectors.AccountProjector.handle/2\n" <>
+          "    (commanded #{commanded_version}) lib/commanded/event/handler.ex:1192: Commanded.Event.Handler.delegate_event_to_handler/2\n"
+
+      assert stacktrace == expected_stacktrace
     end
 
-    test "handles throw kind - sets error status" do
-      recorded_event = build_recorded_event("throw-test")
-      meta = build_meta(recorded_event)
+    test "handles ArgumentError exception" do
+      # Commanded's rescue blocks always emit kind: :error
+      meta =
+        Factory.build_exception_metadata(:account_projector,
+          reason: %ArgumentError{message: "invalid argument"}
+        )
+
+      recorded_event = meta.recorded_event
 
       :telemetry.execute([:commanded, :event, :handle, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :throw,
-          reason: :some_thrown_value,
-          stacktrace: []
-        })
-
-      :telemetry.execute(
-        [:commanded, :event, :handle, :exception],
-        %{duration: 100},
-        exception_meta
-      )
+      :telemetry.execute([:commanded, :event, :handle, :exception], %{duration: 100}, meta)
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
-                        status: {:status, :error, error_msg}
+                        name: "handle MyApp.Projectors.AccountProjector",
+                        status: {:status, :error, error_msg},
+                        attributes: span_attrs
                       )},
                      1000
 
-      assert error_msg =~ "some_thrown_value"
+      # Exception telemetry uses Exception.format_banner()
+      assert error_msg == "** (ArgumentError) invalid argument"
+
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": "MyApp.Projectors.AccountProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.AccountProjector",
+               "messaging.message.id": recorded_event.event_id,
+               "messaging.message.conversation_id": recorded_event.correlation_id,
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "code.function": "handle",
+               "code.namespace": "MyApp.Projectors.AccountProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.event": recorded_event.event_type,
+               "commanded.event.number": recorded_event.event_number,
+               "commanded.correlation_id": recorded_event.correlation_id,
+               "commanded.causation_id": recorded_event.causation_id,
+               "commanded.handler.name": "MyApp.Projectors.AccountProjector",
+               "commanded.stream.id": recorded_event.stream_id,
+               "commanded.stream.version": recorded_event.stream_version,
+               "commanded.handler.kind": "event_handler",
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.ArgumentError"
+             }
     end
 
-    test "handles exit kind exceptions" do
-      recorded_event = build_recorded_event("exit-test")
-      meta = build_meta(recorded_event)
+    test "handles RuntimeError exception" do
+      # Commanded's rescue blocks always emit kind: :error
+      meta =
+        Factory.build_exception_metadata(:account_projector,
+          reason: %RuntimeError{message: "something went wrong"}
+        )
+
+      recorded_event = meta.recorded_event
 
       :telemetry.execute([:commanded, :event, :handle, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :exit,
-          reason: :normal,
-          stacktrace: []
-        })
-
-      :telemetry.execute(
-        [:commanded, :event, :handle, :exception],
-        %{duration: 100},
-        exception_meta
-      )
+      :telemetry.execute([:commanded, :event, :handle, :exception], %{duration: 100}, meta)
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
-                        status: {:status, :error, _}
+                        name: "handle MyApp.Projectors.AccountProjector",
+                        status: {:status, :error, error_msg},
+                        attributes: span_attrs
                       )},
                      1000
+
+      # Exception telemetry uses Exception.format_banner()
+      assert error_msg == "** (RuntimeError) something went wrong"
+
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": "MyApp.Projectors.AccountProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.AccountProjector",
+               "messaging.message.id": recorded_event.event_id,
+               "messaging.message.conversation_id": recorded_event.correlation_id,
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "code.function": "handle",
+               "code.namespace": "MyApp.Projectors.AccountProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.event": recorded_event.event_type,
+               "commanded.event.number": recorded_event.event_number,
+               "commanded.correlation_id": recorded_event.correlation_id,
+               "commanded.causation_id": recorded_event.causation_id,
+               "commanded.handler.name": "MyApp.Projectors.AccountProjector",
+               "commanded.stream.id": recorded_event.stream_id,
+               "commanded.stream.version": recorded_event.stream_version,
+               "commanded.handler.kind": "event_handler",
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.RuntimeError"
+             }
     end
   end
 
@@ -381,7 +397,14 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     end
 
     test "sets error status when batch handler returns error" do
-      meta = build_batch_meta()
+      first_event_id = Commanded.UUID.uuid4()
+      last_event_id = Commanded.UUID.uuid4()
+
+      meta =
+        Factory.build_batch_handler_metadata(:transaction_projector,
+          first_event_id: first_event_id,
+          last_event_id: last_event_id
+        )
 
       :telemetry.execute([:commanded, :event, :batch, :start], %{}, meta)
 
@@ -390,39 +413,77 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
-                        status: {:status, :error, error_message}
+                        name: "batch MyApp.Projectors.TransactionProjector",
+                        status: {:status, :error, error_message},
+                        attributes: span_attrs
                       )},
                      1000
 
-      assert error_message =~ "transaction_rollback"
+      # Atom errors are formatted via inspect()
+      assert error_message == ":transaction_rollback"
+
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "batch",
+               "messaging.destination.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "messaging.batch.message_count": 10,
+               "code.function": "handle_batch",
+               "code.namespace": "MyApp.Projectors.TransactionProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.handler.name": "MyApp.Projectors.TransactionProjector",
+               "commanded.event.count": 10,
+               "commanded.handler.kind": "event_handler",
+               "commanded.batch.first_event_id": first_event_id,
+               "commanded.batch.last_event_id": last_event_id,
+               "error.type": "transaction_rollback"
+             }
     end
 
     test "records exception in batch handler" do
-      meta = build_batch_meta()
+      first_event_id = Commanded.UUID.uuid4()
+      last_event_id = Commanded.UUID.uuid4()
+
+      meta =
+        Factory.build_batch_handler_metadata(:transaction_projector,
+          first_event_id: first_event_id,
+          last_event_id: last_event_id,
+          reason: %DBConnection.ConnectionError{message: "connection refused"}
+        )
 
       :telemetry.execute([:commanded, :event, :batch, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :error,
-          reason: %DBConnection.ConnectionError{message: "connection refused"},
-          stacktrace: []
-        })
-
-      :telemetry.execute(
-        [:commanded, :event, :batch, :exception],
-        %{duration: 100},
-        exception_meta
-      )
+      :telemetry.execute([:commanded, :event, :batch, :exception], %{duration: 100}, meta)
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
+                        name: "batch MyApp.Projectors.TransactionProjector",
                         status: {:status, :error, _},
+                        attributes: span_attrs,
                         events: events
                       )},
                      1000
+
+      assert :otel_attributes.map(span_attrs) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "batch",
+               "messaging.destination.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.destination.subscription.name": "MyApp.Projectors.TransactionProjector",
+               "messaging.consumer.group.name": MyApp.CommandedApp,
+               "messaging.batch.message_count": 10,
+               "code.function": "handle_batch",
+               "code.namespace": "MyApp.Projectors.TransactionProjector",
+               "commanded.application": MyApp.CommandedApp,
+               "commanded.handler.name": "MyApp.Projectors.TransactionProjector",
+               "commanded.event.count": 10,
+               "commanded.handler.kind": "event_handler",
+               "commanded.batch.first_event_id": first_event_id,
+               "commanded.batch.last_event_id": last_event_id,
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.DBConnection.ConnectionError"
+             }
 
       events_list = :otel_events.list(events)
       assert Enum.any?(events_list, fn event(name: n) -> n == :exception end)
@@ -457,7 +518,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         trace_id: child_trace_id,
                         parent_span_id: received_parent_span_id
                       )},
@@ -477,7 +538,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: :undefined
                       )},
                      1000
@@ -495,7 +556,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: :undefined
                       )},
                      1000
@@ -521,7 +582,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: parent_id
                       )},
                      1000
@@ -538,22 +599,16 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     end
 
     test "clears stale context - doesn't inherit parent from pre-existing OTel context" do
-      # This tests the fix for the issue where :link mode didn't clear existing context
-      # before creating spans. If other OTel instrumentation set context in the same
-      # process, spans would have unintended parents.
-
-      # First, set up a "stale" context as if another instrumentation left it
+      # Simulate stale context left by other instrumentation in the same process
       stale_traceparent =
         Tracer.with_span "stale.context.span" do
           encode_traceparent(Tracer.current_span_ctx())
         end
 
-      # Manually set stale context in process dictionary (simulating other instrumentation)
       stale_headers = [{"traceparent", stale_traceparent}]
       stale_ctx = :otel_propagator_text_map.extract_to(:otel_ctx.new(), stale_headers)
       :otel_ctx.attach(stale_ctx)
 
-      # Now dispatch event WITHOUT traceparent (common case for events not from commands)
       recorded_event = build_recorded_event("stale-context-test", %{})
       meta = build_meta(recorded_event)
 
@@ -563,13 +618,12 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: parent_id
                       )},
                      1000
 
-      # The span should NOT have a parent - it should start a fresh trace
-      # This is the key assertion: :link mode should NOT inherit stale context
+      # :link mode must clear stale context, not inherit it
       assert parent_id == :undefined,
              "Expected no parent (fresh trace), but got parent_span_id: #{inspect(parent_id)}. " <>
                "The :link mode is incorrectly inheriting stale context from the process dictionary."
@@ -596,20 +650,18 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         trace_id: span_trace_id,
                         parent_span_id: :undefined,
                         links: links
                       )},
                      1000
 
-      # The span should have its OWN trace_id (not the linked one)
+      # :link mode creates new trace but links to original
       refute span_trace_id == linked_trace_id
 
-      # Should have exactly one link
       [link(trace_id: link_trace_id, span_id: link_span_id)] = :otel_links.list(links)
 
-      # The link should point to the original span
       assert link_trace_id == linked_trace_id
       assert link_span_id == linked_span_id
     end
@@ -624,7 +676,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: :undefined,
                         links: links
                       )},
@@ -643,7 +695,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         links: links
                       )},
                      1000
@@ -660,7 +712,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
+                        name: "batch MyApp.Projectors.TransactionProjector",
                         parent_span_id: :undefined,
                         links: links
                       )},
@@ -687,7 +739,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
+                        name: "batch MyApp.Projectors.TransactionProjector",
                         parent_span_id: parent_id
                       )},
                      1000
@@ -724,7 +776,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: parent_id,
                         links: links
                       )},
@@ -753,7 +805,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         trace_id: span_trace_id,
                         parent_span_id: :undefined,
                         links: links
@@ -774,7 +826,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: :undefined,
                         links: links
                       )},
@@ -801,7 +853,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.TransactionProjector batch",
+                        name: "batch MyApp.Projectors.TransactionProjector",
                         parent_span_id: parent_id,
                         links: links
                       )},
@@ -823,7 +875,23 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
     end
 
     test "handles nil handler_module gracefully" do
-      recorded_event = build_recorded_event("nil-module")
+      event_id = Commanded.UUID.uuid4()
+      aggregate_uuid = Commanded.UUID.uuid4()
+      causation_id = Commanded.UUID.uuid4()
+      correlation_id = Commanded.UUID.uuid4()
+
+      recorded_event =
+        Factory.build_recorded_event(
+          event_id: event_id,
+          event_number: 1,
+          stream_id: "BankAccount-#{aggregate_uuid}",
+          stream_version: 1,
+          causation_id: causation_id,
+          correlation_id: correlation_id,
+          event_type: "Elixir.MyApp.Events.AccountOpened",
+          data: %{account_number: "ACC-nil-module", initial_balance: 1000},
+          metadata: %{}
+        )
 
       meta =
         Factory.build_event_handler_metadata(
@@ -839,14 +907,32 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "TestHandler receive",
+                        name: "handle ",
                         attributes: attributes
                       )},
                      1000
 
-      attrs = :otel_attributes.map(attributes)
-      assert attrs[:"code.namespace"] == nil
-      assert attrs[:"messaging.destination.name"] == nil
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "handle",
+               "messaging.destination.name": nil,
+               "messaging.destination.subscription.name": "TestHandler",
+               "messaging.message.id": event_id,
+               "messaging.message.conversation_id": correlation_id,
+               "messaging.consumer.group.name": TestApp,
+               "code.function": "handle",
+               "code.namespace": nil,
+               "commanded.application": TestApp,
+               "commanded.event": "Elixir.MyApp.Events.AccountOpened",
+               "commanded.event.number": 1,
+               "commanded.correlation_id": correlation_id,
+               "commanded.causation_id": causation_id,
+               "commanded.handler.name": "TestHandler",
+               "commanded.stream.id": "BankAccount-#{aggregate_uuid}",
+               "commanded.stream.version": 1,
+               "commanded.handler.kind": "event_handler"
+             }
     end
 
     test "handles empty metadata map in recorded_event" do
@@ -857,7 +943,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
         {:ok, meta}
       end)
 
-      assert_receive {:span, span(name: "MyApp.Projectors.AccountProjector receive")}, 1000
+      assert_receive {:span, span(name: "handle MyApp.Projectors.AccountProjector")}, 1000
     end
 
     test "handles metadata with only tracestate (no traceparent)" do
@@ -870,40 +956,26 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       assert_receive {:span,
                       span(
-                        name: "MyApp.Projectors.AccountProjector receive",
+                        name: "handle MyApp.Projectors.AccountProjector",
                         parent_span_id: :undefined
                       )},
                      1000
     end
   end
 
-  defp build_recorded_event(suffix, metadata \\ %{}) do
-    Factory.build_recorded_event(
-      stream_id: "BankAccount-#{Commanded.UUID.uuid4()}",
-      event_type: "Elixir.MyApp.Events.AccountOpened",
+  defp build_recorded_event(suffix, metadata) do
+    Factory.build_recorded_event(:account_projector,
       data: %{account_number: "ACC-#{suffix}", initial_balance: 1000},
       metadata: metadata
     )
   end
 
   defp build_meta(recorded_event) do
-    Factory.build_event_handler_metadata(
-      application: MyApp.CommandedApp,
-      handler_name: "MyApp.Projectors.AccountProjector",
-      handler_module: MyApp.Projectors.AccountProjector,
-      handler_state: %{},
-      recorded_event: recorded_event
-    )
+    Factory.build_event_handler_metadata(:account_projector, recorded_event: recorded_event)
   end
 
   defp build_batch_meta do
-    Factory.build_batch_handler_metadata(
-      application: MyApp.CommandedApp,
-      handler_name: "MyApp.Projectors.TransactionProjector",
-      handler_module: MyApp.Projectors.TransactionProjector,
-      handler_state: %{processed_count: 0},
-      event_count: 10
-    )
+    Factory.build_batch_handler_metadata(:transaction_projector)
   end
 
   defp encode_traceparent(span_ctx) do

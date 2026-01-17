@@ -36,6 +36,7 @@ defmodule Commanded.OpenTelemetry do
   See `t:span_relationship/0` for available span relationship modes.
   """
 
+  alias Commanded.OpenTelemetry.Aggregate
   alias Commanded.OpenTelemetry.EventHandler
 
   @typedoc """
@@ -51,6 +52,11 @@ defmodule Commanded.OpenTelemetry do
   @type span_relationship :: :link | :child | :none
 
   @nimble_schema NimbleOptions.new!(
+                   aggregate: [
+                     type: {:in, [:disabled, []]},
+                     default: [],
+                     doc: "Aggregate tracing configuration. Use `:disabled` to disable."
+                   ],
                    event_handler: [
                      type:
                        {:or,
@@ -80,8 +86,11 @@ defmodule Commanded.OpenTelemetry do
 
   ## Examples
 
-      # Default setup (uses :link relationship)
+      # Default setup (enables all tracing)
       Commanded.OpenTelemetry.setup()
+
+      # Disable aggregate tracing
+      Commanded.OpenTelemetry.setup(aggregate: :disabled)
 
       # Disable event handler tracing
       Commanded.OpenTelemetry.setup(event_handler: :disabled)
@@ -94,9 +103,16 @@ defmodule Commanded.OpenTelemetry do
   def setup(opts \\ []) do
     opts = NimbleOptions.validate!(opts, @nimble_schema)
 
+    case opts[:aggregate] do
+      :disabled -> :ok
+      _config -> Aggregate.setup()
+    end
+
     case opts[:event_handler] do
       :disabled -> :ok
       config -> EventHandler.setup(config)
     end
+
+    :ok
   end
 end

@@ -2,6 +2,7 @@ defmodule Commanded.OpenTelemetry.EventHandler do
   @moduledoc false
 
   alias Commanded.OpenTelemetry.CommandedAttributes
+  alias Commanded.OpenTelemetry.Helpers
   alias OpenTelemetry.SemConv.ErrorAttributes
   alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
@@ -56,19 +57,19 @@ defmodule Commanded.OpenTelemetry.EventHandler do
       case span_relationship do
         :link ->
           link_ctx = extract_span_context_for_link(recorded_event.metadata)
-          attach_ctx(nil)
+          Helpers.attach_ctx(nil)
           if link_ctx, do: [OpenTelemetry.link(link_ctx)], else: []
 
         :child ->
-          attach_ctx(recorded_event.metadata)
+          Helpers.attach_ctx(recorded_event.metadata)
           []
 
         :none ->
-          attach_ctx(nil)
+          Helpers.attach_ctx(nil)
           []
       end
 
-    handler_module_name = module_name(meta.handler_module)
+    handler_module_name = Helpers.module_name(meta.handler_module)
 
     attributes = [
       # OTel Messaging SemConv
@@ -104,7 +105,8 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     span_opts = %{kind: :consumer, attributes: attributes}
     span_opts = put_links(span_opts, links)
 
-    span_name = "#{meta.handler_name} receive"
+    # OTel semconv: span name = "{operation.name} {destination.name}"
+    span_name = "handle #{handler_module_name}"
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
@@ -118,8 +120,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
 
     if error = meta[:error] do
-      Span.set_attribute(ctx, ErrorAttributes.error_type(), error_type(error))
-      Span.set_status(ctx, OpenTelemetry.status(:error, format_error(error)))
+      Span.set_attribute(
+        ctx,
+        ErrorAttributes.error_type(),
+        Helpers.to_error_type(error, @tracer_id)
+      )
+
+      Span.set_status(ctx, OpenTelemetry.status(:error, Helpers.format_error(error)))
     end
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
@@ -137,7 +144,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     Span.set_attribute(ctx, :"erlang.exception.kind", kind)
 
     exception = Exception.normalize(kind, reason, stacktrace)
-    Span.set_attribute(ctx, ErrorAttributes.error_type(), error_type(exception))
+
+    Span.set_attribute(
+      ctx,
+      ErrorAttributes.error_type(),
+      Helpers.to_error_type(exception, @tracer_id)
+    )
+
     Span.record_exception(ctx, exception, stacktrace)
 
     Span.set_status(
@@ -157,9 +170,9 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     # Since batch metadata doesn't include traceparent, we always clear context
     # to start fresh traces. This ensures batch spans don't accidentally inherit
     # stale context from the process dictionary (from other OTel instrumentation).
-    attach_ctx(nil)
+    Helpers.attach_ctx(nil)
 
-    handler_module_name = module_name(meta.handler_module)
+    handler_module_name = Helpers.module_name(meta.handler_module)
 
     attributes = [
       # OTel Messaging SemConv
@@ -184,7 +197,8 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
     span_opts = %{kind: :consumer, attributes: attributes}
 
-    span_name = "#{meta.handler_name} batch"
+    # OTel semconv: span name = "{operation.name} {destination.name}"
+    span_name = "batch #{handler_module_name}"
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
@@ -198,8 +212,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
 
     if error = meta[:error] do
-      Span.set_attribute(ctx, ErrorAttributes.error_type(), error_type(error))
-      Span.set_status(ctx, OpenTelemetry.status(:error, format_error(error)))
+      Span.set_attribute(
+        ctx,
+        ErrorAttributes.error_type(),
+        Helpers.to_error_type(error, @tracer_id)
+      )
+
+      Span.set_status(ctx, OpenTelemetry.status(:error, Helpers.format_error(error)))
     end
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
@@ -217,7 +236,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     Span.set_attribute(ctx, :"erlang.exception.kind", kind)
 
     exception = Exception.normalize(kind, reason, stacktrace)
-    Span.set_attribute(ctx, ErrorAttributes.error_type(), error_type(exception))
+
+    Span.set_attribute(
+      ctx,
+      ErrorAttributes.error_type(),
+      Helpers.to_error_type(exception, @tracer_id)
+    )
+
     Span.record_exception(ctx, exception, stacktrace)
 
     Span.set_status(
@@ -228,53 +253,12 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 
-  defp error_type(%{__struct__: module}), do: to_string(module)
-  defp error_type(%{__exception__: true} = exception), do: to_string(exception.__struct__)
-  defp error_type(error) when is_atom(error), do: to_string(error)
-
-  defp error_type(error) do
-    # Emit telemetry so users can hook loggers or monitoring
-    :telemetry.execute(
-      [:commanded, :opentelemetry, :warning],
-      %{count: 1},
-      %{
-        message: "Unknown error type encountered, returning UNKNOWN",
-        error: error,
-        tracer_id: @tracer_id
-      }
-    )
-
-    "UNKNOWN"
-  end
-
-  defp format_error(%{__exception__: true} = exception), do: Exception.message(exception)
-  defp format_error(error) when is_binary(error), do: error
-  defp format_error(error), do: inspect(error)
-
-  # Clears stale context when metadata has no traceparent to prevent Event B
-  # from incorrectly becoming a child of Event A's trace.
-  defp attach_ctx(nil) do
-    :otel_ctx.attach(:otel_ctx.new())
-  end
-
-  defp attach_ctx(metadata) when is_map(metadata) do
-    headers = build_headers_from_metadata(metadata)
-
-    if headers != [] do
-      fresh_ctx = :otel_ctx.new()
-      extracted_ctx = :otel_propagator_text_map.extract_to(fresh_ctx, headers)
-      :otel_ctx.attach(extracted_ctx)
-    else
-      :otel_ctx.attach(:otel_ctx.new())
-    end
-  end
-
   # Extract span context from W3C headers for :link span relationship.
   # Returns context without setting as current (unlike attach_ctx/1).
   defp extract_span_context_for_link(nil), do: nil
 
   defp extract_span_context_for_link(metadata) when is_map(metadata) do
-    headers = build_headers_from_metadata(metadata)
+    headers = Helpers.build_headers_from_metadata(metadata)
 
     if headers != [] do
       fresh_ctx = :otel_ctx.new()
@@ -284,23 +268,6 @@ defmodule Commanded.OpenTelemetry.EventHandler do
       nil
     end
   end
-
-  defp build_headers_from_metadata(metadata) do
-    []
-    |> maybe_add_header(metadata, "traceparent")
-    |> maybe_add_header(metadata, "tracestate")
-  end
-
-  defp maybe_add_header(headers, metadata, key) do
-    case metadata[key] do
-      nil -> headers
-      value -> [{key, value} | headers]
-    end
-  end
-
-  defp module_name(nil), do: nil
-  defp module_name(module) when is_atom(module), do: inspect(module)
-  defp module_name(_), do: nil
 
   defp put_links(span_opts, []), do: span_opts
   defp put_links(span_opts, links), do: Map.put(span_opts, :links, links)
