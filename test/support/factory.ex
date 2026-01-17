@@ -113,7 +113,17 @@ defmodule Commanded.TestSupport.Factory do
     }
   end
 
-  def build_recorded_event(opts \\ []) do
+  def build_recorded_event(name_or_opts \\ [])
+
+  def build_recorded_event(:account_projector) do
+    build_recorded_event(:account_projector, [])
+  end
+
+  def build_recorded_event(:transaction_projector) do
+    build_recorded_event(:transaction_projector, [])
+  end
+
+  def build_recorded_event(opts) when is_list(opts) do
     account_id = Keyword.get(opts, :account_id, UUID.uuid4())
 
     default_data = %TestDomain.AccountOpened{
@@ -149,6 +159,34 @@ defmodule Commanded.TestSupport.Factory do
       created_at: Keyword.fetch!(opts, :created_at),
       metadata: Keyword.fetch!(opts, :metadata)
     }
+  end
+
+  def build_recorded_event(:account_projector, opts) do
+    aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
+
+    build_recorded_event(
+      Keyword.merge(
+        [
+          event_type: "Elixir.MyApp.Events.AccountOpened",
+          stream_id: "BankAccount-#{aggregate_uuid}"
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_recorded_event(:transaction_projector, opts) do
+    aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
+
+    build_recorded_event(
+      Keyword.merge(
+        [
+          event_type: "Elixir.MyApp.Events.TransactionCreated",
+          stream_id: "Transaction-#{aggregate_uuid}"
+        ],
+        opts
+      )
+    )
   end
 
   def build_telemetry_start_measurements(opts \\ []) do
@@ -187,7 +225,17 @@ defmodule Commanded.TestSupport.Factory do
     }
   end
 
-  def build_event_handler_metadata(opts \\ []) do
+  def build_event_handler_metadata(name_or_opts \\ [])
+
+  def build_event_handler_metadata(:account_projector) do
+    build_event_handler_metadata(:account_projector, [])
+  end
+
+  def build_event_handler_metadata(:transaction_projector) do
+    build_event_handler_metadata(:transaction_projector, [])
+  end
+
+  def build_event_handler_metadata(opts) when is_list(opts) do
     recorded_event =
       Keyword.get_lazy(opts, :recorded_event, fn ->
         build_recorded_event()
@@ -214,7 +262,55 @@ defmodule Commanded.TestSupport.Factory do
     }
   end
 
-  def build_batch_handler_metadata(opts \\ []) do
+  def build_event_handler_metadata(:account_projector, opts) do
+    recorded_event =
+      Keyword.get_lazy(opts, :recorded_event, fn ->
+        build_recorded_event(:account_projector, opts)
+      end)
+
+    build_event_handler_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.AccountProjector",
+          handler_module: MyApp.Projectors.AccountProjector,
+          recorded_event: recorded_event
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_event_handler_metadata(:transaction_projector, opts) do
+    recorded_event =
+      Keyword.get_lazy(opts, :recorded_event, fn ->
+        build_recorded_event(:transaction_projector, opts)
+      end)
+
+    build_event_handler_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.TransactionProjector",
+          handler_module: MyApp.Projectors.TransactionProjector,
+          recorded_event: recorded_event
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_batch_handler_metadata(name_or_opts \\ [])
+
+  def build_batch_handler_metadata(:account_projector) do
+    build_batch_handler_metadata(:account_projector, [])
+  end
+
+  def build_batch_handler_metadata(:transaction_projector) do
+    build_batch_handler_metadata(:transaction_projector, [])
+  end
+
+  def build_batch_handler_metadata(opts) when is_list(opts) do
     defaults = [
       application: Keyword.get(opts, :application, MockApp),
       handler_name: "BatchAccountEventHandler",
@@ -229,7 +325,7 @@ defmodule Commanded.TestSupport.Factory do
 
     opts = Keyword.merge(defaults, opts)
 
-    %{
+    base = %{
       application: Keyword.fetch!(opts, :application),
       handler_name: Keyword.fetch!(opts, :handler_name),
       handler_module: Keyword.fetch!(opts, :handler_module),
@@ -240,9 +336,75 @@ defmodule Commanded.TestSupport.Factory do
       event_count: Keyword.fetch!(opts, :event_count),
       recorded_event: Keyword.fetch!(opts, :recorded_event)
     }
+
+    # Add optional fields
+    base
+    |> maybe_put(:error, opts)
+    |> maybe_put_exception_fields(opts)
   end
 
-  def build_exception_metadata(opts \\ []) do
+  defp maybe_put(map, key, opts) do
+    case Keyword.fetch(opts, key) do
+      {:ok, value} -> Map.put(map, key, value)
+      :error -> map
+    end
+  end
+
+  # When reason is provided, default kind to :error and stacktrace to []
+  defp maybe_put_exception_fields(map, opts) do
+    case Keyword.fetch(opts, :reason) do
+      {:ok, reason} ->
+        map
+        |> Map.put(:kind, Keyword.get(opts, :kind, :error))
+        |> Map.put(:reason, reason)
+        |> Map.put(:stacktrace, Keyword.get(opts, :stacktrace, []))
+
+      :error ->
+        map
+    end
+  end
+
+  def build_batch_handler_metadata(:account_projector, opts) do
+    build_batch_handler_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.AccountProjector",
+          handler_module: MyApp.Projectors.AccountProjector,
+          handler_state: %{processed_count: 0},
+          event_count: 10
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_batch_handler_metadata(:transaction_projector, opts) do
+    build_batch_handler_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.TransactionProjector",
+          handler_module: MyApp.Projectors.TransactionProjector,
+          handler_state: %{processed_count: 0},
+          event_count: 10
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_exception_metadata(name_or_opts \\ [])
+
+  def build_exception_metadata(:account_projector) do
+    build_exception_metadata(:account_projector, [])
+  end
+
+  def build_exception_metadata(:transaction_projector) do
+    build_exception_metadata(:transaction_projector, [])
+  end
+
+  def build_exception_metadata(opts) when is_list(opts) do
     recorded_event =
       Keyword.get_lazy(opts, :recorded_event, fn ->
         build_recorded_event()
@@ -273,6 +435,111 @@ defmodule Commanded.TestSupport.Factory do
       reason: Keyword.fetch!(opts, :reason),
       stacktrace: Keyword.fetch!(opts, :stacktrace)
     }
+  end
+
+  def build_exception_metadata(:account_projector, opts) do
+    recorded_event =
+      Keyword.get_lazy(opts, :recorded_event, fn ->
+        build_recorded_event(:account_projector, opts)
+      end)
+
+    build_exception_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.AccountProjector",
+          handler_module: MyApp.Projectors.AccountProjector,
+          recorded_event: recorded_event,
+          reason: %KeyError{key: :account_number, term: %{balance: 100}},
+          stacktrace: [
+            {MyApp.Projectors.AccountProjector, :handle, 2,
+             [file: ~c"lib/my_app/projectors/account_projector.ex", line: 45]},
+            {Commanded.Event.Handler, :delegate_event_to_handler, 2,
+             [file: ~c"lib/commanded/event/handler.ex", line: 1192]}
+          ]
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_exception_metadata(:transaction_projector, opts) do
+    recorded_event =
+      Keyword.get_lazy(opts, :recorded_event, fn ->
+        build_recorded_event(:transaction_projector, opts)
+      end)
+
+    build_exception_metadata(
+      Keyword.merge(
+        [
+          application: MyApp.CommandedApp,
+          handler_name: "MyApp.Projectors.TransactionProjector",
+          handler_module: MyApp.Projectors.TransactionProjector,
+          recorded_event: recorded_event
+        ],
+        opts
+      )
+    )
+  end
+
+  def build_aggregate_execute_metadata(opts \\ []) do
+    aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
+
+    command =
+      Keyword.get_lazy(opts, :command, fn ->
+        build_open_account(account_id: aggregate_uuid)
+      end)
+
+    execution_context =
+      Keyword.get_lazy(opts, :execution_context, fn ->
+        %{
+          command: command,
+          causation_id: Keyword.get(opts, :causation_id, UUID.uuid4()),
+          correlation_id: Keyword.get(opts, :correlation_id, UUID.uuid4()),
+          handler: Keyword.get(opts, :handler, TestDomain.Account),
+          function: Keyword.get(opts, :function, :execute),
+          metadata: Keyword.get(opts, :metadata, %{})
+        }
+      end)
+
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      aggregate_uuid: aggregate_uuid,
+      aggregate_state: Keyword.get(opts, :aggregate_state, %{}),
+      aggregate_version: Keyword.get(opts, :aggregate_version, 0),
+      caller: Keyword.get(opts, :caller, self()),
+      execution_context: execution_context
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
+      aggregate_state: Keyword.fetch!(opts, :aggregate_state),
+      aggregate_version: Keyword.fetch!(opts, :aggregate_version),
+      caller: Keyword.fetch!(opts, :caller),
+      execution_context: Keyword.fetch!(opts, :execution_context)
+    }
+  end
+
+  def build_aggregate_execute_stop_metadata(opts \\ []) do
+    base = build_aggregate_execute_metadata(opts)
+
+    Map.merge(base, %{
+      events: Keyword.get(opts, :events, []),
+      error: Keyword.get(opts, :error, nil)
+    })
+  end
+
+  def build_aggregate_execute_exception_metadata(opts \\ []) do
+    base = build_aggregate_execute_metadata(opts)
+
+    Map.merge(base, %{
+      kind: Keyword.get(opts, :kind, :error),
+      reason: Keyword.get(opts, :reason, %RuntimeError{message: "Test error"}),
+      stacktrace: Keyword.get(opts, :stacktrace, [])
+    })
   end
 
   def build_telemetry_event(event_type, opts \\ [])
@@ -313,6 +580,30 @@ defmodule Commanded.TestSupport.Factory do
     measurements = build_telemetry_stop_measurements()
     metadata = build_batch_handler_metadata(opts)
     event_name = [:commanded, :event, :batch, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:aggregate_start, opts) do
+    measurements = build_telemetry_start_measurements()
+    metadata = build_aggregate_execute_metadata(opts)
+    event_name = [:commanded, :aggregate, :execute, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:aggregate_stop, opts) do
+    measurements = build_telemetry_stop_measurements()
+    metadata = build_aggregate_execute_stop_metadata(opts)
+    event_name = [:commanded, :aggregate, :execute, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:aggregate_exception, opts) do
+    measurements = build_telemetry_exception_measurements()
+    metadata = build_aggregate_execute_exception_metadata(opts)
+    event_name = [:commanded, :aggregate, :execute, :exception]
 
     {event_name, measurements, metadata}
   end
