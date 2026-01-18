@@ -15,7 +15,10 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
   setup do
     start_supervised!(DefaultApp)
+
+    detach_handlers()
     Aggregate.setup()
+
     :ok
   end
 

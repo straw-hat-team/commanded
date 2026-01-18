@@ -37,6 +37,7 @@ defmodule Commanded.OpenTelemetry do
   """
 
   alias Commanded.OpenTelemetry.Aggregate
+  alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler
 
   @typedoc """
@@ -56,6 +57,12 @@ defmodule Commanded.OpenTelemetry do
                      type: {:in, [:disabled, []]},
                      default: [],
                      doc: "Aggregate tracing configuration. Use `:disabled` to disable."
+                   ],
+                   application: [
+                     type: {:in, [:disabled, []]},
+                     default: [],
+                     doc:
+                       "Application dispatch tracing configuration. Use `:disabled` to disable."
                    ],
                    event_handler: [
                      type:
@@ -92,6 +99,9 @@ defmodule Commanded.OpenTelemetry do
       # Disable aggregate tracing
       Commanded.OpenTelemetry.setup(aggregate: :disabled)
 
+      # Disable application dispatch tracing
+      Commanded.OpenTelemetry.setup(application: :disabled)
+
       # Disable event handler tracing
       Commanded.OpenTelemetry.setup(event_handler: :disabled)
 
@@ -106,6 +116,11 @@ defmodule Commanded.OpenTelemetry do
     case opts[:aggregate] do
       :disabled -> :ok
       _config -> Aggregate.setup()
+    end
+
+    case opts[:application] do
+      :disabled -> :ok
+      _config -> OTelApplication.setup()
     end
 
     case opts[:event_handler] do
