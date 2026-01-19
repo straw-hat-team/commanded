@@ -45,6 +45,8 @@ defmodule Commanded.OpenTelemetryCase do
         [:commanded, :aggregate, :execute, :start],
         [:commanded, :aggregate, :execute, :stop],
         [:commanded, :aggregate, :execute, :exception],
+        [:commanded, :aggregate, :populate, :start],
+        [:commanded, :aggregate, :populate, :stop],
         [:commanded, :application, :dispatch, :start],
         [:commanded, :application, :dispatch, :stop],
         [:commanded, :application, :dispatch, :exception]

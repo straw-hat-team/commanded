@@ -596,6 +596,26 @@ defmodule Commanded.TestSupport.Factory do
     })
   end
 
+  def build_aggregate_populate_metadata(opts \\ []) do
+    aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
+
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      aggregate_uuid: aggregate_uuid,
+      aggregate_state: Keyword.get(opts, :aggregate_state, %{}),
+      aggregate_version: Keyword.get(opts, :aggregate_version, 0)
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
+      aggregate_state: Keyword.fetch!(opts, :aggregate_state),
+      aggregate_version: Keyword.fetch!(opts, :aggregate_version)
+    }
+  end
+
   def build_telemetry_event(event_type, opts \\ [])
 
   def build_telemetry_event(:start, opts) do
