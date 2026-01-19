@@ -37,6 +37,7 @@ defmodule Commanded.OpenTelemetry do
   """
 
   alias Commanded.OpenTelemetry.Aggregate
+  alias Commanded.OpenTelemetry.AggregatePopulate
   alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler
 
@@ -57,6 +58,11 @@ defmodule Commanded.OpenTelemetry do
                      type: {:in, [:disabled, []]},
                      default: [],
                      doc: "Aggregate tracing configuration. Use `:disabled` to disable."
+                   ],
+                   aggregate_populate: [
+                     type: {:in, [:disabled, []]},
+                     default: [],
+                     doc: "Aggregate populate tracing configuration. Use `:disabled` to disable."
                    ],
                    application: [
                      type: {:in, [:disabled, []]},
@@ -105,6 +111,9 @@ defmodule Commanded.OpenTelemetry do
       # Disable event handler tracing
       Commanded.OpenTelemetry.setup(event_handler: :disabled)
 
+      # Disable aggregate populate tracing
+      Commanded.OpenTelemetry.setup(aggregate_populate: :disabled)
+
       # Use parent-child relationships for event handlers
       Commanded.OpenTelemetry.setup(event_handler: [span_relationship: :child])
 
@@ -116,6 +125,11 @@ defmodule Commanded.OpenTelemetry do
     case opts[:aggregate] do
       :disabled -> :ok
       _config -> Aggregate.setup()
+    end
+
+    case opts[:aggregate_populate] do
+      :disabled -> :ok
+      _config -> AggregatePopulate.setup()
     end
 
     case opts[:application] do
