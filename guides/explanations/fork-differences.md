@@ -218,11 +218,11 @@ end
 With a dedicated protocol, the API response format and the event store stream ID format are properly separated and can evolve independently.
 
 ### **OpenTelemetry Integration**
-[PR #41](https://github.com/straw-hat-team/commanded/pull/41)
+PRs: [#37](https://github.com/straw-hat-team/commanded/pull/37), [#41](https://github.com/straw-hat-team/commanded/pull/41), [#45](https://github.com/straw-hat-team/commanded/pull/45), [#46](https://github.com/straw-hat-team/commanded/pull/46), [#47](https://github.com/straw-hat-team/commanded/pull/47)
 
 **Changes:**
 - Added `Commanded.OpenTelemetry` module for distributed tracing
-- Creates spans for event handler and batch event processing
+- Creates spans for event handlers (PR #41), EventStore operations (PR #37), aggregate execution (PR #45), application dispatch (PR #46), and aggregate populate (PR #47)
 - Added `opentelemetry_api`, `opentelemetry_telemetry`, and `opentelemetry_semantic_conventions` as required dependencies
 
 **Usage:**
