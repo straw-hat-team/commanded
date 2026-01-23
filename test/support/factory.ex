@@ -706,6 +706,286 @@ defmodule Commanded.TestSupport.Factory do
     {event_name, measurements, metadata}
   end
 
+  def build_telemetry_event(:event_store_append_to_stream_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_751_180_934_041),
+      system_time: Keyword.get(opts, :system_time, 1_769_132_756_438_728_125)
+    }
+
+    metadata = build_event_store_append_to_stream_metadata(opts)
+    event_name = [:commanded, :event_store, :append_to_stream, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_append_to_stream_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_751_102_678_041),
+      duration: Keyword.get(opts, :duration, 78_256_000)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_append_to_stream_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :append_to_stream, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_stream_forward_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_916_612_542),
+      system_time: Keyword.get(opts, :system_time, 1_769_137_874_780_173_542)
+    }
+
+    metadata = build_event_store_stream_forward_metadata(opts)
+    event_name = [:commanded, :event_store, :stream_forward, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_stream_forward_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_895_139_292),
+      duration: Keyword.get(opts, :duration, 21_473_250)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_stream_forward_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :stream_forward, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_subscribe_to_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_834_979_708),
+      system_time: Keyword.get(opts, :system_time, 1_769_132_779_441_574_667)
+    }
+
+    metadata = build_event_store_subscribe_to_metadata(opts)
+    event_name = [:commanded, :event_store, :subscribe_to, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_subscribe_to_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_766_990_583),
+      duration: Keyword.get(opts, :duration, 67_989_125)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_subscribe_to_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :subscribe_to, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_record_snapshot_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_928_468_041),
+      system_time: Keyword.get(opts, :system_time, 1_769_132_779_348_086_042)
+    }
+
+    metadata = build_event_store_record_snapshot_metadata(opts)
+    event_name = [:commanded, :event_store, :record_snapshot, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_record_snapshot_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_904_372_541),
+      duration: Keyword.get(opts, :duration, 24_095_500)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_record_snapshot_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :record_snapshot, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_read_snapshot_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_548_527_667),
+      system_time: Keyword.get(opts, :system_time, 1_769_137_875_148_258_375)
+    }
+
+    metadata = build_event_store_read_snapshot_metadata(opts)
+    event_name = [:commanded, :event_store, :read_snapshot, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_read_snapshot_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_534_117_958),
+      duration: Keyword.get(opts, :duration, 14_409_709)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_read_snapshot_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :read_snapshot, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_ack_event_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_664_247_583),
+      system_time: Keyword.get(opts, :system_time, 1_769_137_875_032_538_583)
+    }
+
+    metadata = build_event_store_ack_event_metadata(opts)
+    event_name = [:commanded, :event_store, :ack_event, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_ack_event_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_645_331_875),
+      duration: Keyword.get(opts, :duration, 18_915_708)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_ack_event_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :ack_event, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_delete_snapshot_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_736_021_125),
+      system_time: Keyword.get(opts, :system_time, 1_769_134_205_344_113_250)
+    }
+
+    metadata = build_event_store_delete_snapshot_metadata(opts)
+    event_name = [:commanded, :event_store, :delete_snapshot, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_delete_snapshot_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_706_717_459),
+      duration: Keyword.get(opts, :duration, 29_303_666)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_delete_snapshot_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :delete_snapshot, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_subscribe_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_920_081_042),
+      system_time: Keyword.get(opts, :system_time, 1_769_134_231_524_992_167)
+    }
+
+    metadata = build_event_store_subscribe_metadata(opts)
+    event_name = [:commanded, :event_store, :subscribe, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_subscribe_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_920_064_292),
+      duration: Keyword.get(opts, :duration, 16_750)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_subscribe_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :subscribe, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_unsubscribe_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_751_014_001_958),
+      system_time: Keyword.get(opts, :system_time, 1_769_134_231_431_071_083)
+    }
+
+    metadata = build_event_store_unsubscribe_metadata(opts)
+    event_name = [:commanded, :event_store, :unsubscribe, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_unsubscribe_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_750_998_181_375),
+      duration: Keyword.get(opts, :duration, 15_820_583)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_unsubscribe_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :unsubscribe, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_delete_subscription_start, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_751_154_259_667),
+      system_time: Keyword.get(opts, :system_time, 1_769_134_231_290_813_417)
+    }
+
+    metadata = build_event_store_delete_subscription_metadata(opts)
+    event_name = [:commanded, :event_store, :delete_subscription, :start]
+
+    {event_name, measurements, metadata}
+  end
+
+  def build_telemetry_event(:event_store_delete_subscription_stop, opts) do
+    measurements = %{
+      monotonic_time: Keyword.get(opts, :monotonic_time, -576_460_751_123_691_917),
+      duration: Keyword.get(opts, :duration, 30_567_750)
+    }
+
+    metadata =
+      opts
+      |> build_event_store_delete_subscription_metadata()
+      |> maybe_put(:error, opts)
+
+    event_name = [:commanded, :event_store, :delete_subscription, :stop]
+
+    {event_name, measurements, metadata}
+  end
+
   def build_account_scenario(opts \\ []) do
     account_id = Keyword.get(opts, :account_id, UUID.uuid4())
     owner = Keyword.get(opts, :owner, "Test User")
@@ -773,6 +1053,176 @@ defmodule Commanded.TestSupport.Factory do
       event: event,
       recorded_event: recorded_event,
       account_id: account_id
+    }
+  end
+
+  def build_event_store_append_to_stream_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      stream_uuid: Keyword.get(opts, :stream_uuid, UUID.uuid4()),
+      expected_version: Keyword.get(opts, :expected_version, 0)
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      stream_uuid: Keyword.fetch!(opts, :stream_uuid),
+      expected_version: Keyword.fetch!(opts, :expected_version)
+    }
+  end
+
+  def build_event_store_stream_forward_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      stream_uuid: Keyword.get(opts, :stream_uuid, UUID.uuid4()),
+      start_version: Keyword.get(opts, :start_version, 0),
+      read_batch_size: Keyword.get(opts, :read_batch_size, 1000)
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      stream_uuid: Keyword.fetch!(opts, :stream_uuid),
+      start_version: Keyword.fetch!(opts, :start_version),
+      read_batch_size: Keyword.fetch!(opts, :read_batch_size)
+    }
+  end
+
+  def build_event_store_subscribe_to_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      stream_uuid: Keyword.get(opts, :stream_uuid, :all),
+      subscription_name: Keyword.get(opts, :subscription_name, "test_subscription"),
+      subscriber: Keyword.get(opts, :subscriber, self()),
+      start_from: Keyword.get(opts, :start_from, :origin)
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      stream_uuid: Keyword.fetch!(opts, :stream_uuid),
+      subscription_name: Keyword.fetch!(opts, :subscription_name),
+      subscriber: Keyword.fetch!(opts, :subscriber),
+      start_from: Keyword.fetch!(opts, :start_from)
+    }
+  end
+
+  def build_event_store_ack_event_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      subscription: Keyword.get(opts, :subscription, self()),
+      event: Keyword.get(opts, :event, %{})
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      subscription: Keyword.fetch!(opts, :subscription),
+      event: Keyword.fetch!(opts, :event)
+    }
+  end
+
+  def build_event_store_record_snapshot_metadata(opts \\ []) do
+    source_uuid = Keyword.get(opts, :source_uuid, UUID.uuid4())
+
+    snapshot =
+      Keyword.get_lazy(opts, :snapshot, fn ->
+        %Commanded.EventStore.SnapshotData{
+          source_uuid: source_uuid,
+          source_version: 5,
+          source_type: "TestAggregate",
+          data: %{state: "test"},
+          metadata: %{},
+          created_at: DateTime.utc_now()
+        }
+      end)
+
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      snapshot: snapshot
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      snapshot: Keyword.fetch!(opts, :snapshot)
+    }
+  end
+
+  def build_event_store_read_snapshot_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      source_uuid: Keyword.get(opts, :source_uuid, UUID.uuid4())
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      source_uuid: Keyword.fetch!(opts, :source_uuid)
+    }
+  end
+
+  def build_event_store_delete_snapshot_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      source_uuid: Keyword.get(opts, :source_uuid, UUID.uuid4())
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      source_uuid: Keyword.fetch!(opts, :source_uuid)
+    }
+  end
+
+  def build_event_store_subscribe_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      stream_uuid: Keyword.get(opts, :stream_uuid, UUID.uuid4())
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      stream_uuid: Keyword.fetch!(opts, :stream_uuid)
+    }
+  end
+
+  def build_event_store_unsubscribe_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      subscription: Keyword.get(opts, :subscription, self())
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      subscription: Keyword.fetch!(opts, :subscription)
+    }
+  end
+
+  def build_event_store_delete_subscription_metadata(opts \\ []) do
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      subscribe_to: Keyword.get(opts, :subscribe_to, :all),
+      handler_name: Keyword.get(opts, :handler_name, "TestHandler")
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      subscribe_to: Keyword.fetch!(opts, :subscribe_to),
+      handler_name: Keyword.fetch!(opts, :handler_name)
     }
   end
 end

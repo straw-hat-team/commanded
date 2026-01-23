@@ -17,6 +17,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     start_supervised!(DefaultApp)
 
     detach_handlers()
+    detach_event_store_handlers()
     Aggregate.setup()
 
     :ok
@@ -616,6 +617,29 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
         ] do
       for handler <- :telemetry.list_handlers(event) do
         :telemetry.detach(handler.id)
+      end
+    end
+  end
+
+  defp detach_event_store_handlers do
+    event_store_events = ~w(
+      ack_event
+      append_to_stream
+      delete_snapshot
+      delete_subscription
+      read_snapshot
+      record_snapshot
+      stream_forward
+      subscribe
+      subscribe_to
+      unsubscribe
+    )a
+
+    for event <- event_store_events do
+      for suffix <- [:start, :stop, :exception] do
+        for handler <- :telemetry.list_handlers([:commanded, :event_store, event, suffix]) do
+          :telemetry.detach(handler.id)
+        end
       end
     end
   end
