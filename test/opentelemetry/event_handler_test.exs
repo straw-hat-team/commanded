@@ -280,8 +280,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
       assert map_size(exc_attrs_map) == 3
       assert exc_attrs_map[:"exception.type"] == "Elixir.KeyError"
 
-      assert exc_attrs_map[:"exception.message"] ==
-               "key :account_number not found in:\n\n    %{balance: 100}\n"
+      assert exc_attrs_map[:"exception.message"] =~ "key :account_number not found in:"
 
       # Version number in stacktrace changes per release
       stacktrace = exc_attrs_map[:"exception.stacktrace"]

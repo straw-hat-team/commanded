@@ -71,9 +71,13 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   If the snapshot exists, fetch any subsequent events to rebuild its state.
   Otherwise start with the aggregate struct and stream all existing events for
   the aggregate from the event store to rebuild its state from those events.
+
+  The initial state is determined by the `initial_state` field:
+    - If a module is provided, `initial_state.initial_state()` is called
+    - Otherwise, falls back to `struct(aggregate_module)`
   """
   def populate(%Aggregate{} = state) do
-    %Aggregate{aggregate_module: aggregate_module, snapshotting: snapshotting} = state
+    %Aggregate{snapshotting: snapshotting} = state
 
     {aggregate, snapshot_used, snapshot_source_version} =
       case Snapshotting.read_snapshot(snapshotting) do
@@ -90,7 +94,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
           agg = %Aggregate{
             state
             | aggregate_version: 0,
-              aggregate_state: struct(aggregate_module)
+              aggregate_state: create_initial_state(state)
           }
 
           {agg, false, nil}
@@ -100,6 +104,15 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
       snapshot_used: snapshot_used,
       snapshot_source_version: snapshot_source_version
     )
+  end
+
+  defp create_initial_state(%Aggregate{initial_state: nil, aggregate_module: aggregate_module}) do
+    struct(aggregate_module)
+  end
+
+  defp create_initial_state(%Aggregate{initial_state: initial_state})
+       when is_atom(initial_state) do
+    initial_state.initial_state()
   end
 
   @doc """

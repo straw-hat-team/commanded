@@ -24,6 +24,7 @@ defmodule Commanded.Commands.Dispatcher do
       :handler_function,
       :handler_before_execute,
       :aggregate_module,
+      :initial_state,
       :identity,
       :identity_prefix,
       :timeout,
@@ -77,77 +78,86 @@ defmodule Commanded.Commands.Dispatcher do
   @dialyzer {:nowarn_function, execute: 3}
   defp execute(%Pipeline{} = pipeline, %Payload{} = payload, %ExecutionContext{} = context) do
     %Pipeline{application: application, assigns: %{aggregate_uuid: aggregate_uuid}} = pipeline
-    %Payload{aggregate_module: aggregate_module, timeout: timeout} = payload
 
-    {:ok, ^aggregate_uuid} =
-      Commanded.Aggregates.Supervisor.open_aggregate(
-        application,
-        aggregate_module,
-        aggregate_uuid
-      )
+    %Payload{aggregate_module: aggregate_module, initial_state: initial_state, timeout: timeout} =
+      payload
 
-    task_dispatcher_name = Module.concat([application, Commanded.Commands.TaskDispatcher])
+    case Commanded.Aggregates.Supervisor.open_aggregate(
+           application,
+           aggregate_module,
+           aggregate_uuid,
+           initial_state: initial_state,
+           timeout: timeout
+         ) do
+      {:ok, ^aggregate_uuid} ->
+        task_dispatcher_name = Module.concat([application, Commanded.Commands.TaskDispatcher])
 
-    task =
-      Task.Supervisor.async_nolink(task_dispatcher_name, Aggregate, :execute, [
-        application,
-        aggregate_module,
-        aggregate_uuid,
-        context,
-        timeout
-      ])
+        task =
+          Task.Supervisor.async_nolink(task_dispatcher_name, Aggregate, :execute, [
+            application,
+            aggregate_module,
+            aggregate_uuid,
+            context,
+            timeout
+          ])
 
-    result =
-      case Task.yield(task, timeout) || Task.shutdown(task) do
-        {:ok, result} ->
-          result
+        result =
+          case Task.yield(task, timeout) || Task.shutdown(task) do
+            {:ok, result} ->
+              result
 
-        {:exit, {:normal, :aggregate_stopped}} = result ->
-          result
+            {:exit, {:normal, :aggregate_stopped}} = result ->
+              result
 
-        {:exit, {{:nodedown, _node_name}, {GenServer, :call, _}}} ->
-          {:error, :remote_node_down}
+            {:exit, {{:nodedown, _node_name}, {GenServer, :call, _}}} ->
+              {:error, :remote_node_down}
 
-        {:exit, _reason} ->
-          {:error, :aggregate_execution_failed}
+            {:exit, _reason} ->
+              {:error, :aggregate_execution_failed}
 
-        nil ->
-          {:error, :aggregate_execution_timeout}
-      end
+            nil ->
+              {:error, :aggregate_execution_timeout}
+          end
 
-    case result do
-      {:ok, aggregate_version, events, aggregate_state} ->
-        pipeline
-        |> Pipeline.assign(:aggregate_version, aggregate_version)
-        |> Pipeline.assign(:events, events)
-        |> Pipeline.assign(:aggregate_state, aggregate_state)
-        |> after_dispatch(payload)
-        |> Pipeline.respond(:ok)
+        case result do
+          {:ok, aggregate_version, events, aggregate_state} ->
+            pipeline
+            |> Pipeline.assign(:aggregate_version, aggregate_version)
+            |> Pipeline.assign(:events, events)
+            |> Pipeline.assign(:aggregate_state, aggregate_state)
+            |> after_dispatch(payload)
+            |> Pipeline.respond(:ok)
 
-      {:ok, aggregate_version, events, aggregate_state, reply} ->
-        pipeline
-        |> Pipeline.assign(:aggregate_version, aggregate_version)
-        |> Pipeline.assign(:events, events)
-        |> Pipeline.assign(:aggregate_state, aggregate_state)
-        |> after_dispatch(payload)
-        |> Pipeline.respond({:ok, reply})
+          {:ok, aggregate_version, events, aggregate_state, reply} ->
+            pipeline
+            |> Pipeline.assign(:aggregate_version, aggregate_version)
+            |> Pipeline.assign(:events, events)
+            |> Pipeline.assign(:aggregate_state, aggregate_state)
+            |> after_dispatch(payload)
+            |> Pipeline.respond({:ok, reply})
 
-      {:exit, {:normal, :aggregate_stopped}} ->
-        # Maybe retry command when aggregate process stopped by lifespan timeout
-        maybe_retry(pipeline, payload, context)
+          {:exit, {:normal, :aggregate_stopped}} ->
+            # Maybe retry command when aggregate process stopped by lifespan timeout
+            maybe_retry(pipeline, payload, context)
 
-      {:error, :remote_node_down} ->
-        # Maybe retry command when aggregate process not found on a remote node
-        maybe_retry(pipeline, payload, context)
+          {:error, :remote_node_down} ->
+            # Maybe retry command when aggregate process not found on a remote node
+            maybe_retry(pipeline, payload, context)
+
+          {:error, error} ->
+            pipeline
+            |> Pipeline.respond({:error, error})
+            |> after_failure(payload)
+
+          {:error, error, reason} ->
+            pipeline
+            |> Pipeline.assign(:error_reason, reason)
+            |> Pipeline.respond({:error, error})
+            |> after_failure(payload)
+        end
 
       {:error, error} ->
         pipeline
-        |> Pipeline.respond({:error, error})
-        |> after_failure(payload)
-
-      {:error, error, reason} ->
-        pipeline
-        |> Pipeline.assign(:error_reason, reason)
         |> Pipeline.respond({:error, error})
         |> after_failure(payload)
     end
