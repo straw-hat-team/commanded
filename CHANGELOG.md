@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.2.0](https://github.com/straw-hat-team/commanded/compare/v3.1.0...v3.2.0) (2026-01-23)
+
+
+### Features
+
+* add OpenTelemetry EventStore instrumentation ([#37](https://github.com/straw-hat-team/commanded/issues/37)) ([6bb4b00](https://github.com/straw-hat-team/commanded/commit/6bb4b0074423daf4a8a823279fa14ab4c604f613))
+* Add OpenTelemetry instrumentation for aggregate populate ([#47](https://github.com/straw-hat-team/commanded/issues/47)) ([f7b43d1](https://github.com/straw-hat-team/commanded/commit/f7b43d1bbc2ab1efe9d9eda2961f2f669721f48b))
+* Add OpenTelemetry instrumentation for event handlers ([#41](https://github.com/straw-hat-team/commanded/issues/41)) ([5946d5a](https://github.com/straw-hat-team/commanded/commit/5946d5ab1957e1a641ed983b8bfeefe08e92e7fb))
+* implement OpenTelemetry instrumentation for aggregates ([#45](https://github.com/straw-hat-team/commanded/issues/45)) ([4e99401](https://github.com/straw-hat-team/commanded/commit/4e9940165dd59f0d08e53e48d01b6f112c3e0660))
+* implement OpenTelemetry instrumentation for application ([#46](https://github.com/straw-hat-team/commanded/issues/46)) ([a4bc0fd](https://github.com/straw-hat-team/commanded/commit/a4bc0fd8722c7d16907f57ff80f527f0f1153178))
+
 ## [3.1.0](https://github.com/straw-hat-team/commanded/compare/v3.0.0...v3.1.0) (2026-01-13)
 
 
