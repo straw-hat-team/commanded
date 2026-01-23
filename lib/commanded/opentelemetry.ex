@@ -40,6 +40,7 @@ defmodule Commanded.OpenTelemetry do
   alias Commanded.OpenTelemetry.AggregatePopulate
   alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler
+  alias Commanded.OpenTelemetry.EventStore
 
   @typedoc """
   Determines how event handler spans relate to command dispatch spans.
@@ -85,6 +86,12 @@ defmodule Commanded.OpenTelemetry do
                         ]},
                      default: [],
                      doc: "Event handler tracing configuration. Use `:disabled` to disable."
+                   ],
+                   event_store: [
+                     type: {:in, [:disabled, []]},
+                     default: :disabled,
+                     doc:
+                       "Event store tracing configuration. Disabled by default. Use `[]` to enable."
                    ]
                  )
 
@@ -99,7 +106,7 @@ defmodule Commanded.OpenTelemetry do
 
   ## Examples
 
-      # Default setup (enables all tracing)
+      # Default setup (enables all tracing except event_store)
       Commanded.OpenTelemetry.setup()
 
       # Disable aggregate tracing
@@ -113,6 +120,9 @@ defmodule Commanded.OpenTelemetry do
 
       # Disable aggregate populate tracing
       Commanded.OpenTelemetry.setup(aggregate_populate: :disabled)
+
+      # Enable event store tracing (disabled by default)
+      Commanded.OpenTelemetry.setup(event_store: [])
 
       # Use parent-child relationships for event handlers
       Commanded.OpenTelemetry.setup(event_handler: [span_relationship: :child])
@@ -140,6 +150,11 @@ defmodule Commanded.OpenTelemetry do
     case opts[:event_handler] do
       :disabled -> :ok
       config -> EventHandler.setup(config)
+    end
+
+    case opts[:event_store] do
+      :disabled -> :ok
+      _config -> EventStore.setup()
     end
 
     :ok
