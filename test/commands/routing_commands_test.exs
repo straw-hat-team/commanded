@@ -43,10 +43,11 @@ defmodule Commanded.Commands.RoutingCommandsTest do
     defmodule CommandHandlerRouter do
       use Commanded.Commands.Router
 
+      # Put the :to option at the end and ensure the dispatch still works
       dispatch OpenAccount,
-        to: OpenAccountHandler,
         aggregate: BankAccount,
-        identity: :account_number
+        identity: :account_number,
+        to: OpenAccountHandler
 
       dispatch DepositMoney,
         to: DepositMoneyHandler,
@@ -54,7 +55,7 @@ defmodule Commanded.Commands.RoutingCommandsTest do
         identity: :account_number
     end
 
-    test "should dispatch command to registered handler" do
+    test "should dispatch command to registered handler, regardless of the router dispatch option order" do
       assert :ok =
                CommandHandlerRouter.dispatch(
                  %OpenAccount{
@@ -240,6 +241,21 @@ defmodule Commanded.Commands.RoutingCommandsTest do
                      end
                    """)
                  end
+  end
+
+  test "should show a helpful message when required :to argument is missing" do
+    assert_raise RuntimeError, "dispatch missing required parameter: :to", fn ->
+      Code.eval_string("""
+        alias Commanded.ExampleDomain.BankAccount
+        alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
+
+        defmodule InvalidRouter do
+          use Commanded.Commands.Router
+
+          dispatch OpenAccount, identity: BankAccount
+        end
+      """)
+    end
   end
 
   defmodule MultiCommandRouter do

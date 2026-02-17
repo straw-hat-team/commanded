@@ -359,7 +359,7 @@ defmodule Commanded.Commands.Router do
 
   """
   defmacro dispatch(command_module_or_modules, opts) do
-    opts = parse_opts(opts, [])
+    opts = parse_opts(opts)
 
     for command_module <- List.wrap(command_module_or_modules) do
       quote do
@@ -666,28 +666,29 @@ defmodule Commanded.Commands.Router do
     :consistency
   ]
 
-  defp parse_opts([{:to, aggregate_or_handler} | opts], result) do
-    case Keyword.pop(opts, :aggregate) do
-      {nil, opts} ->
-        aggregate = aggregate_or_handler
-        parse_opts(opts, [function: :execute, to: aggregate, aggregate: aggregate] ++ result)
+  defp parse_opts(opts) do
+    {to, opts} = Keyword.pop(opts, :to)
+    {aggregate, opts} = Keyword.pop(opts, :aggregate)
+    {function, opts} = Keyword.pop(opts, :function)
 
-      {aggregate, opts} ->
-        handler = aggregate_or_handler
-        parse_opts(opts, [function: :handle, to: handler, aggregate: aggregate] ++ result)
+    with {unknown_param, _} <- Enum.find(opts, fn {param, _} -> param not in @register_params end) do
+      raise """
+      unexpected dispatch parameter "#{unknown_param}"
+      available params are: #{Enum.map_join(@register_params, ", ", &to_string/1)}
+      """
+    end
+
+    case {to, aggregate} do
+      {nil, _aggregate} ->
+        raise "dispatch missing required parameter: :to"
+
+      {to, nil} ->
+        function = function || :execute
+        [function: function, to: to, aggregate: to] ++ opts
+
+      {to, aggregate} ->
+        function = function || :handle
+        [function: function, to: to, aggregate: aggregate] ++ opts
     end
   end
-
-  defp parse_opts([{param, value} | opts], result) when param in @register_params do
-    parse_opts(opts, [{param, value} | result])
-  end
-
-  defp parse_opts([{param, _value} | _opts], _result) do
-    raise """
-    unexpected dispatch parameter "#{param}"
-    available params are: #{Enum.map_join(@register_params, ", ", &to_string/1)}
-    """
-  end
-
-  defp parse_opts([], result), do: result
 end
