@@ -671,6 +671,14 @@ defmodule Commanded.Commands.Router do
     {aggregate, opts} = Keyword.pop(opts, :aggregate)
     {function, opts} = Keyword.pop(opts, :function)
 
+    # Check for duplicate keys that would be silently merged
+    Enum.each([:to, :aggregate, :function], fn key ->
+      if Keyword.has_key?(opts, key) do
+        raise ArgumentError,
+              "duplicate dispatch parameter \"#{key}\" - only one value allowed"
+      end
+    end)
+
     with {unknown_param, _} <- Enum.find(opts, fn {param, _} -> param not in @register_params end) do
       raise """
       unexpected dispatch parameter "#{unknown_param}"
