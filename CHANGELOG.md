@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.3.0](https://github.com/straw-hat-team/commanded/compare/v3.2.0...v3.3.0) (2026-02-23)
+
+
+### Features
+
+* Add selector option support for InMemory adapter ([625f54b](https://github.com/straw-hat-team/commanded/commit/625f54b3dccab031ceabfe1aeca7e409170e7f4f))
+
+
+### Bug Fixes
+
+* Check for duplicates before popping from keyword list ([d4dcbdc](https://github.com/straw-hat-team/commanded/commit/d4dcbdc3bb5f2af2f54c2e52a7b1a7b96d5cd41e))
+* Improve router registration error messages ([124f4f4](https://github.com/straw-hat-team/commanded/commit/124f4f4ff8113d721f793ee667e90191b22ab117))
+* Raise ArgumentError instead of RuntimeError for router config errors ([a0add7f](https://github.com/straw-hat-team/commanded/commit/a0add7f49c55a8419e9372662faf41e351ae8bc9))
+* Reject duplicate dispatch options in router ([582f9da](https://github.com/straw-hat-team/commanded/commit/582f9da58a6878c9f1c27c7f89d18c945577bffe))
+* Update release-please workflow to match beam-monorepo config ([27981f6](https://github.com/straw-hat-team/commanded/commit/27981f671d9024059ed63a3ebeebf60994575f9b))
+
 ## [3.2.0](https://github.com/straw-hat-team/commanded/compare/v3.1.0...v3.2.0) (2026-01-23)
 
 
