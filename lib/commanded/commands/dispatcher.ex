@@ -67,8 +67,10 @@ defmodule Commanded.Commands.Dispatcher do
     struct(Pipeline, Map.from_struct(payload))
   end
 
+  # credo:disable-for-next-line Credo.Check.Design.TagFIXME
   # FIXME: Elixir 1.18.x-otp-28
   # Please file a bug in https://github.com/jeremyjh/dialyxir/issues with this message.
+  # credo:disable-for-next-line Credo.Check.Readability.MaxLineLength
   # Unknown error occurred: %FunctionClauseError{module: Dialyxir.Warnings.CallWithoutOpaque, function: :format_long, arity: 1, kind: nil, args: nil, clauses: nil}
   # Open issue in dialyxir:
   # https://github.com/jeremyjh/dialyxir/issues/568
