@@ -224,7 +224,7 @@ defmodule Commanded.Commands.RoutingCommandsTest do
   end
 
   test "should show a helpful message when bad argument given to a `dispatch/2` function" do
-    assert_raise RuntimeError,
+    assert_raise ArgumentError,
                  """
                  unexpected dispatch parameter "id"
                  available params are: to, function, before_execute, aggregate, identity, identity_prefix, timeout, lifespan, consistency
@@ -244,7 +244,7 @@ defmodule Commanded.Commands.RoutingCommandsTest do
   end
 
   test "should show a helpful message when required :to argument is missing" do
-    assert_raise RuntimeError, "dispatch missing required parameter: :to", fn ->
+    assert_raise ArgumentError, "dispatch missing required parameter: :to", fn ->
       Code.eval_string("""
         alias Commanded.ExampleDomain.BankAccount
         alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
@@ -354,6 +354,74 @@ defmodule Commanded.Commands.RoutingCommandsTest do
         application: DefaultApp,
         metadata: metadata
       )
+    end
+  end
+
+  describe "duplicate dispatch options" do
+    test "should reject duplicate :to option" do
+      assert_raise ArgumentError,
+                   ~r/duplicate dispatch parameter "to" - only one value allowed/,
+                   fn ->
+                     Code.eval_string("""
+                       alias Commanded.ExampleDomain.BankAccount
+                       alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
+                       alias Commanded.ExampleDomain.OpenAccountHandler
+                       alias Commanded.ExampleDomain.DepositMoneyHandler
+
+                       defmodule DuplicateToRouter do
+                         use Commanded.Commands.Router
+
+                         dispatch OpenAccount,
+                           to: OpenAccountHandler,
+                           to: DepositMoneyHandler,
+                           identity: :account_number
+                       end
+                     """)
+                   end
+    end
+
+    test "should reject duplicate :aggregate option" do
+      assert_raise ArgumentError,
+                   ~r/duplicate dispatch parameter "aggregate" - only one value allowed/,
+                   fn ->
+                     Code.eval_string("""
+                       alias Commanded.ExampleDomain.BankAccount
+                       alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
+                       alias Commanded.ExampleDomain.OpenAccountHandler
+                       alias Commanded.Commands.AggregateRoot
+
+                       defmodule DuplicateAggregateRouter do
+                         use Commanded.Commands.Router
+
+                         dispatch OpenAccount,
+                           to: OpenAccountHandler,
+                           aggregate: BankAccount,
+                           aggregate: AggregateRoot,
+                           identity: :account_number
+                       end
+                     """)
+                   end
+    end
+
+    test "should reject duplicate :function option" do
+      assert_raise ArgumentError,
+                   ~r/duplicate dispatch parameter "function" - only one value allowed/,
+                   fn ->
+                     Code.eval_string("""
+                       alias Commanded.ExampleDomain.BankAccount
+                       alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
+
+                       defmodule DuplicateFunctionRouter do
+                         use Commanded.Commands.Router
+
+                         dispatch OpenAccount,
+                           to: BankAccount,
+                           function: :execute,
+                           function: :handle,
+                           identity: :account_number
+                       end
+                     """)
+                   end
     end
   end
 end
