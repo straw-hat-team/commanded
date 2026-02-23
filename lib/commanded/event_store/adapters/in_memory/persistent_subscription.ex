@@ -11,6 +11,7 @@ defmodule Commanded.EventStore.Adapters.InMemory.PersistentSubscription do
     :name,
     :partition_by,
     :ref,
+    :selector,
     :start_from,
     :stream_uuid,
     subscribers: []
@@ -116,6 +117,13 @@ defmodule Commanded.EventStore.Adapters.InMemory.PersistentSubscription do
     else
       subscription
     end
+  end
+
+  @doc """
+  Set the checkpoint for a subscriber.
+  """
+  def checkpoint(%PersistentSubscription{} = subscription, checkpoint) do
+    %PersistentSubscription{subscription | checkpoint: checkpoint}
   end
 
   # Get the subscriber to send the event to determined by the partition function

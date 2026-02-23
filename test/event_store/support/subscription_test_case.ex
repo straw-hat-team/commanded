@@ -208,6 +208,30 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         refute_receive {:events, _received_events}
       end
 
+      test "should skip events that do not match the :selector", %{
+        event_store: event_store,
+        event_store_meta: event_store_meta
+      } do
+        odd_accounts_selector = fn event -> rem(event.data.account_number, 2) == 1 end
+
+        :ok = event_store.append_to_stream(event_store_meta, "stream1", 0, build_events(3))
+
+        {:ok, subscription} =
+          event_store.subscribe_to(event_store_meta, "stream1", "subscriber", self(), :origin,
+            selector: odd_accounts_selector
+          )
+
+        # Ensure the filter is working and all events are for odd-numbered accounts
+        assert_receive {:subscribed, ^subscription}
+        events = receive_events(event_store, event_store_meta, subscription, 2)
+        assert Enum.all?(events, &(&1.data.account_number in [1, 3]))
+
+        # Ensure that events appended after subscription still respect the filter
+        :ok = event_store.append_to_stream(event_store_meta, "stream1", 3, build_events(3))
+        more_events = receive_events(event_store, event_store_meta, subscription, 2)
+        assert Enum.all?(more_events, &(&1.data.account_number in [1, 3]))
+      end
+
       test "should prevent duplicate subscriptions", %{
         event_store: event_store,
         event_store_meta: event_store_meta
@@ -301,6 +325,33 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
         assert_receive_events(event_store, event_store_meta, subscription, count: 3, from: 4)
 
         refute_receive {:events, _received_events}
+      end
+
+      test "should skip events that do not match the :selector", %{
+        event_store: event_store,
+        event_store_meta: event_store_meta
+      } do
+        odd_accounts_selector = fn event -> rem(event.data.account_number, 2) == 1 end
+
+        :ok = event_store.append_to_stream(event_store_meta, "stream1", 0, build_events(3))
+        :ok = event_store.append_to_stream(event_store_meta, "stream2", 0, build_events(3))
+
+        wait_for_event_store()
+
+        {:ok, subscription} =
+          event_store.subscribe_to(event_store_meta, :all, "subscriber", self(), :origin,
+            selector: odd_accounts_selector
+          )
+
+        # Ensure the filter is working and all events are for odd-numbered accounts
+        assert_receive {:subscribed, ^subscription}
+        events = receive_events(event_store, event_store_meta, subscription, 4)
+        assert Enum.all?(events, &(&1.data.account_number in [1, 3]))
+
+        # Ensure that events appended after subscription still respect the filter
+        :ok = event_store.append_to_stream(event_store_meta, "stream3", 0, build_events(3))
+        more_events = receive_events(event_store, event_store_meta, subscription, 2)
+        assert Enum.all?(more_events, &(&1.data.account_number in [1, 3]))
       end
 
       test "should prevent duplicate subscriptions", %{
@@ -828,6 +879,24 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
       |> Enum.each(fn {received_event, expected_event_number} ->
         assert received_event.event_number == expected_event_number
       end)
+    end
+
+    defp receive_events(event_store, event_store_meta, subscription, count) do
+      assert_receive {:events, received_events}
+      last_event = List.last(received_events)
+      event_store.ack_event(event_store_meta, subscription, last_event)
+
+      case count - length(received_events) do
+        0 ->
+          received_events
+
+        remaining when remaining > 0 ->
+          received_events ++
+            receive_events(event_store, event_store_meta, subscription, remaining)
+
+        remaining when remaining < 0 ->
+          flunk("Received #{abs(remaining)} more event(s) than expected")
+      end
     end
 
     defp build_event(account_number) do
