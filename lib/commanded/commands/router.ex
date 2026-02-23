@@ -667,17 +667,21 @@ defmodule Commanded.Commands.Router do
   ]
 
   defp parse_opts(opts) do
+    # Check for duplicate keys before popping
+    Enum.each([:to, :aggregate, :function], fn key ->
+      case Keyword.get_values(opts, key) do
+        [_, _ | _] ->
+          raise ArgumentError,
+                "duplicate dispatch parameter \"#{key}\" - only one value allowed"
+
+        _ ->
+          :ok
+      end
+    end)
+
     {to, opts} = Keyword.pop(opts, :to)
     {aggregate, opts} = Keyword.pop(opts, :aggregate)
     {function, opts} = Keyword.pop(opts, :function)
-
-    # Check for duplicate keys that would be silently merged
-    Enum.each([:to, :aggregate, :function], fn key ->
-      if Keyword.has_key?(opts, key) do
-        raise ArgumentError,
-              "duplicate dispatch parameter \"#{key}\" - only one value allowed"
-      end
-    end)
 
     with {unknown_param, _} <- Enum.find(opts, fn {param, _} -> param not in @register_params end) do
       raise ArgumentError, """
