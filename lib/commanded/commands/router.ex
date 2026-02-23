@@ -680,7 +680,7 @@ defmodule Commanded.Commands.Router do
     end)
 
     with {unknown_param, _} <- Enum.find(opts, fn {param, _} -> param not in @register_params end) do
-      raise """
+      raise ArgumentError, """
       unexpected dispatch parameter "#{unknown_param}"
       available params are: #{Enum.map_join(@register_params, ", ", &to_string/1)}
       """
@@ -688,7 +688,7 @@ defmodule Commanded.Commands.Router do
 
     case {to, aggregate} do
       {nil, _aggregate} ->
-        raise "dispatch missing required parameter: :to"
+        raise ArgumentError, "dispatch missing required parameter: :to"
 
       {to, nil} ->
         function = function || :execute
