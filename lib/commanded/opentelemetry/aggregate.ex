@@ -32,9 +32,10 @@ defmodule Commanded.OpenTelemetry.Aggregate do
       ) do
     context = meta.execution_context
 
-    # Propagate trace context from command metadata (aggregates run in separate processes)
-    # Uses W3C traceparent/tracestate headers injected by TraceContextPropagator middleware
-    Helpers.attach_ctx(context.metadata)
+    case Helpers.extract_propagated_ctx(context.metadata) do
+      {_links, :undefined} -> Helpers.clear_ctx()
+      {_links, ctx} -> :otel_ctx.attach(ctx)
+    end
 
     handler_module_name = Helpers.module_name(context.handler)
 

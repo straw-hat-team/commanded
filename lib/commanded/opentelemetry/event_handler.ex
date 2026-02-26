@@ -50,22 +50,23 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     recorded_event = meta.recorded_event
     span_relationship = config.span_relationship
 
-    # Clear any stale context and set up links based on span_relationship mode.
-    # All modes must explicitly handle context to avoid inheriting unintended parents
-    # from pre-existing OTel context in the process dictionary.
     links =
       case span_relationship do
         :link ->
-          link_ctx = extract_span_context_for_link(recorded_event.metadata)
-          Helpers.attach_ctx(nil)
-          if link_ctx, do: [OpenTelemetry.link(link_ctx)], else: []
+          {links, _ctx} = Helpers.extract_propagated_ctx(recorded_event.metadata)
+          Helpers.clear_ctx()
+          links
 
         :child ->
-          Helpers.attach_ctx(recorded_event.metadata)
+          case Helpers.extract_propagated_ctx(recorded_event.metadata) do
+            {_links, :undefined} -> Helpers.clear_ctx()
+            {_links, ctx} -> :otel_ctx.attach(ctx)
+          end
+
           []
 
         :none ->
-          Helpers.attach_ctx(nil)
+          Helpers.clear_ctx()
           []
       end
 
@@ -170,7 +171,7 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     # Since batch metadata doesn't include traceparent, we always clear context
     # to start fresh traces. This ensures batch spans don't accidentally inherit
     # stale context from the process dictionary (from other OTel instrumentation).
-    Helpers.attach_ctx(nil)
+    Helpers.clear_ctx()
 
     handler_module_name = Helpers.module_name(meta.handler_module)
 
@@ -251,22 +252,6 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     )
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
-  end
-
-  # Extract span context from W3C headers for :link span relationship.
-  # Returns context without setting as current (unlike attach_ctx/1).
-  defp extract_span_context_for_link(nil), do: nil
-
-  defp extract_span_context_for_link(metadata) when is_map(metadata) do
-    headers = Helpers.build_headers_from_metadata(metadata)
-
-    if headers != [] do
-      fresh_ctx = :otel_ctx.new()
-      extracted_ctx = :otel_propagator_text_map.extract_to(fresh_ctx, headers)
-      :otel_tracer.current_span_ctx(extracted_ctx)
-    else
-      nil
-    end
   end
 
   defp put_links(span_opts, []), do: span_opts

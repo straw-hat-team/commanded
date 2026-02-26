@@ -7,6 +7,8 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
   alias Commanded.TestSupport.Factory
   alias Commanded.UUID
 
+  require OpenTelemetry.Tracer, as: Tracer
+
   setup do
     start_supervised!(DefaultApp)
 
@@ -101,6 +103,79 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
                "commanded.correlation_id": correlation_id,
                "commanded.causation_id": causation_id
              }
+    end
+  end
+
+  describe "context propagation — dispatch within an active span" do
+    @describetag :context_propagation
+
+    test "dispatch span becomes a child of the active parent span (same trace_id, correct parent_span_id)" do
+      causation_id = UUID.uuid4()
+      correlation_id = UUID.uuid4()
+
+      # Simulate a gRPC/HTTP handler that creates a parent span, then dispatches a command.
+      # The dispatch span MUST be a child of this parent span.
+      {parent_trace_id, parent_span_id} =
+        Tracer.with_span "grpc.server.request" do
+          ctx = Tracer.current_span_ctx()
+          parent_trace_id = :otel_span.trace_id(ctx)
+          parent_span_id = :otel_span.span_id(ctx)
+
+          meta =
+            Factory.build_application_dispatch_metadata(
+              causation_id: causation_id,
+              correlation_id: correlation_id
+            )
+
+          :telemetry.execute([:commanded, :application, :dispatch, :start], %{}, meta)
+
+          :telemetry.execute(
+            [:commanded, :application, :dispatch, :stop],
+            %{duration: 1000},
+            meta
+          )
+
+          {parent_trace_id, parent_span_id}
+        end
+
+      assert_receive {:span,
+                      span(
+                        name: "dispatch Commanded.TestSupport.TestDomain.Account",
+                        trace_id: dispatch_trace_id,
+                        parent_span_id: dispatch_parent_span_id
+                      )},
+                     1000
+
+      assert dispatch_trace_id == parent_trace_id,
+             "Dispatch span should share the same trace_id as the parent span. " <>
+               "Expected: #{parent_trace_id}, got: #{dispatch_trace_id}. " <>
+               "This means the dispatch span started a new trace instead of joining the parent."
+
+      assert dispatch_parent_span_id == parent_span_id,
+             "Dispatch span's parent_span_id should be the gRPC server span. " <>
+               "Expected: #{parent_span_id}, got: #{inspect(dispatch_parent_span_id)}. " <>
+               "This means context propagation is broken — the dispatch span is disconnected."
+    end
+
+    test "dispatch span without active parent and no metadata starts a new trace" do
+      causation_id = UUID.uuid4()
+      correlation_id = UUID.uuid4()
+
+      meta =
+        Factory.build_application_dispatch_metadata(
+          causation_id: causation_id,
+          correlation_id: correlation_id
+        )
+
+      :telemetry.execute([:commanded, :application, :dispatch, :start], %{}, meta)
+      :telemetry.execute([:commanded, :application, :dispatch, :stop], %{duration: 1000}, meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "dispatch Commanded.TestSupport.TestDomain.Account",
+                        parent_span_id: :undefined
+                      )},
+                     1000
     end
   end
 
