@@ -1,29 +1,31 @@
 defmodule Commanded.OpenTelemetry.Helpers do
   @moduledoc false
 
-  # Propagates trace context across process boundaries. Commanded runs aggregates
-  # and event handlers in separate processes, so we extract W3C trace headers
-  # from metadata to maintain parent-child span relationships.
-  #
-  # When nil or no headers, we clear context to prevent inheriting stale context
-  # from the process dictionary (which could link unrelated traces).
-  def attach_ctx(nil) do
-    :otel_ctx.attach(:otel_ctx.new())
+  def extract_propagated_ctx(nil), do: {[], :undefined}
+
+  def extract_propagated_ctx(metadata) when is_map(metadata) do
+    headers = build_headers_from_metadata(metadata)
+    if headers == [], do: {[], :undefined}, else: extract_to_ctx(headers)
   end
 
-  def attach_ctx(metadata) when is_map(metadata) do
-    headers = build_headers_from_metadata(metadata)
+  defp extract_to_ctx(headers) do
+    ctx =
+      :otel_ctx.new()
+      |> :otel_propagator_text_map.extract_to(headers)
 
-    if headers != [] do
-      fresh_ctx = :otel_ctx.new()
-      extracted_ctx = :otel_propagator_text_map.extract_to(fresh_ctx, headers)
-      :otel_ctx.attach(extracted_ctx)
-    else
-      :otel_ctx.attach(:otel_ctx.new())
+    span_ctx = :otel_tracer.current_span_ctx(ctx)
+
+    case span_ctx do
+      :undefined -> {[], :undefined}
+      span_ctx -> {[OpenTelemetry.link(span_ctx)], ctx}
     end
   end
 
-  def build_headers_from_metadata(metadata) do
+  def clear_ctx do
+    :otel_ctx.attach(:otel_ctx.new())
+  end
+
+  defp build_headers_from_metadata(metadata) do
     []
     |> maybe_add_header(metadata, "traceparent")
     |> maybe_add_header(metadata, "tracestate")

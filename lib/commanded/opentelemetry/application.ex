@@ -32,11 +32,6 @@ defmodule Commanded.OpenTelemetry.Application do
       ) do
     context = meta.execution_context
 
-    # Attach trace context from command metadata if present.
-    # The TraceContextPropagator middleware injects W3C traceparent/tracestate headers
-    # into metadata, allowing explicit context propagation when needed.
-    Helpers.attach_ctx(context.metadata)
-
     handler_module_name = Helpers.module_name(context.handler)
 
     attributes = [
