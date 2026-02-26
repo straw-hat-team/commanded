@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.1](https://github.com/straw-hat-team/commanded/compare/v3.3.0...v3.3.1) (2026-02-26)
+
+
+### Bug Fixes
+
+* Use Broadway/Oban pattern for OTel context propagation ([4185ca1](https://github.com/straw-hat-team/commanded/commit/4185ca1da3997de7a7a2813e6943b154172a34ac))
+
 ## [3.3.0](https://github.com/straw-hat-team/commanded/compare/v3.2.0...v3.3.0) (2026-02-23)
 
 
