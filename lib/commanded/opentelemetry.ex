@@ -89,9 +89,8 @@ defmodule Commanded.OpenTelemetry do
                    ],
                    event_store: [
                      type: {:in, [:disabled, []]},
-                     default: :disabled,
-                     doc:
-                       "Event store tracing configuration. Disabled by default. Use `[]` to enable."
+                     default: [],
+                     doc: "Event store tracing configuration. Use `:disabled` to disable."
                    ]
                  )
 
@@ -106,7 +105,7 @@ defmodule Commanded.OpenTelemetry do
 
   ## Examples
 
-      # Default setup (enables all tracing except event_store)
+      # Default setup (enables all tracing)
       Commanded.OpenTelemetry.setup()
 
       # Disable aggregate tracing
@@ -121,8 +120,8 @@ defmodule Commanded.OpenTelemetry do
       # Disable aggregate populate tracing
       Commanded.OpenTelemetry.setup(aggregate_populate: :disabled)
 
-      # Enable event store tracing (disabled by default)
-      Commanded.OpenTelemetry.setup(event_store: [])
+      # Disable event store tracing
+      Commanded.OpenTelemetry.setup(event_store: :disabled)
 
       # Use parent-child relationships for event handlers
       Commanded.OpenTelemetry.setup(event_handler: [span_relationship: :child])
