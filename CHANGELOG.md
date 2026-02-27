@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/straw-hat-team/commanded/compare/v3.3.1...v3.3.2) (2026-02-27)
+
+
+### Bug Fixes
+
+* Enable event store OpenTelemetry tracing by default ([#56](https://github.com/straw-hat-team/commanded/issues/56)) ([642ab64](https://github.com/straw-hat-team/commanded/commit/642ab64131d7ff0540924051e5118185ee06ee84))
+
 ## [3.3.1](https://github.com/straw-hat-team/commanded/compare/v3.3.0...v3.3.1) (2026-02-26)
 
 
