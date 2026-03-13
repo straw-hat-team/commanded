@@ -9,7 +9,7 @@ defmodule Commanded.Mixfile do
       name: "Commanded",
       app: :commanded,
       version: @version,
-      elixir: "~> 1.12",
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
