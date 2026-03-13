@@ -616,6 +616,37 @@ defmodule Commanded.TestSupport.Factory do
     }
   end
 
+  def build_aggregate_load_stop_metadata(meta, opts \\ []) do
+    Map.merge(meta, %{
+      snapshot_used: Keyword.get(opts, :snapshot_used, false),
+      snapshot_source_version: Keyword.get(opts, :snapshot_source_version),
+      aggregate_version:
+        Keyword.get(opts, :aggregate_version, Map.get(meta, :aggregate_version, 0))
+    })
+  end
+
+  def build_aggregate_snapshot_metadata(opts \\ []) do
+    aggregate_uuid = Keyword.get(opts, :aggregate_uuid, UUID.uuid4())
+
+    defaults = [
+      application: Keyword.get(opts, :application, MockApp),
+      aggregate_uuid: aggregate_uuid,
+      aggregate_version: Keyword.get(opts, :aggregate_version, 0),
+      snapshot_every: Keyword.get(opts, :snapshot_every),
+      snapshot_module_version: Keyword.get(opts, :snapshot_module_version)
+    ]
+
+    opts = Keyword.merge(defaults, opts)
+
+    %{
+      application: Keyword.fetch!(opts, :application),
+      aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
+      aggregate_version: Keyword.fetch!(opts, :aggregate_version),
+      snapshot_every: Keyword.get(opts, :snapshot_every),
+      snapshot_module_version: Keyword.get(opts, :snapshot_module_version)
+    }
+  end
+
   def build_telemetry_event(event_type, opts \\ [])
 
   def build_telemetry_event(:start, opts) do
@@ -1131,11 +1162,13 @@ defmodule Commanded.TestSupport.Factory do
 
     snapshot =
       Keyword.get_lazy(opts, :snapshot, fn ->
+        account = build_account(account_id: source_uuid)
+
         %Commanded.EventStore.SnapshotData{
           source_uuid: source_uuid,
           source_version: 5,
-          source_type: "TestAggregate",
-          data: %{state: "test"},
+          source_type: "Elixir.Commanded.TestSupport.TestDomain.Account",
+          data: account,
           metadata: %{},
           created_at: DateTime.utc_now()
         }

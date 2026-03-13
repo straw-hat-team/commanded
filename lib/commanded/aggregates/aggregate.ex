@@ -64,6 +64,49 @@ defmodule Commanded.Aggregates.Aggregate do
     """
   })
 
+  telemetry_event(%{
+    event: [:commanded, :aggregate, :snapshot, :start],
+    description: "Emitted when an aggregate begins taking a snapshot",
+    measurements: "%{system_time: integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_version: non_neg_integer(),
+      snapshot_every: non_neg_integer() | nil,
+      snapshot_module_version: non_neg_integer()}
+    """
+  })
+
+  telemetry_event(%{
+    event: [:commanded, :aggregate, :snapshot, :stop],
+    description: "Emitted when an aggregate completes taking a snapshot",
+    measurements: "%{duration: non_neg_integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_version: non_neg_integer(),
+      snapshot_every: non_neg_integer() | nil,
+      snapshot_module_version: non_neg_integer(),
+      error: nil | any()}
+    """
+  })
+
+  telemetry_event(%{
+    event: [:commanded, :aggregate, :snapshot, :exception],
+    description: "Emitted when an aggregate raises during snapshot",
+    measurements: "%{duration: non_neg_integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_version: non_neg_integer(),
+      snapshot_every: non_neg_integer() | nil,
+      snapshot_module_version: non_neg_integer(),
+      kind: :throw | :error | :exit,
+      reason: any(),
+      stacktrace: list()}
+    """
+  })
+
   @moduledoc """
   Aggregate is a `GenServer` process used to provide access to an
   instance of an event sourced aggregate.
@@ -628,22 +671,42 @@ defmodule Commanded.Aggregates.Aggregate do
 
   defp do_take_snapshot(%Aggregate{} = state) do
     %Aggregate{
+      application: application,
+      aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
       aggregate_version: aggregate_version,
-      snapshotting: snapshotting
+      snapshotting: %Snapshotting{
+        snapshot_every: snapshot_every,
+        snapshot_module_version: snapshot_module_version
+      }
     } = state
 
-    Logger.debug(describe(state) <> " recording snapshot")
+    meta = %{
+      application: application,
+      aggregate_uuid: aggregate_uuid,
+      aggregate_version: aggregate_version,
+      snapshot_every: snapshot_every,
+      snapshot_module_version: snapshot_module_version
+    }
 
-    case Snapshotting.take_snapshot(snapshotting, aggregate_version, aggregate_state) do
-      {:ok, snapshotting} ->
-        {:ok, %Aggregate{state | snapshotting: snapshotting}}
+    :telemetry.span([:commanded, :aggregate, :snapshot], meta, fn ->
+      Logger.debug(describe(state) <> " recording snapshot")
 
-      {:error, reason} = error ->
-        Logger.warning(describe(state) <> " snapshot failed due to: " <> inspect(reason))
+      result =
+        case Snapshotting.take_snapshot(state.snapshotting, aggregate_version, aggregate_state) do
+          {:ok, snapshotting} ->
+            {:ok, %Aggregate{state | snapshotting: snapshotting}}
 
-        error
-    end
+          {:error, reason} = error ->
+            Logger.warning(describe(state) <> " snapshot failed due to: " <> inspect(reason))
+            error
+        end
+
+      stop_meta =
+        Map.put(meta, :error, if(match?({:error, _}, result), do: elem(result, 1), else: nil))
+
+      {result, stop_meta}
+    end)
   end
 
   defp telemetry_wrong_expected_version(context, from, state) do

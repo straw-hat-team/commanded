@@ -304,8 +304,9 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
     end
   end
 
-  @tag :unit
   describe "load/populate telemetry (unit: MockedApp + expect)" do
+    @describetag :unit
+
     setup do
       attach_telemetry()
       :ok

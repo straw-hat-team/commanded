@@ -141,4 +141,28 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   """
   @spec commanded_batch_last_event_id() :: :"commanded.batch.last_event_id"
   def commanded_batch_last_event_id, do: :"commanded.batch.last_event_id"
+
+  @doc """
+  Whether a snapshot was used during aggregate populate.
+  """
+  @spec commanded_snapshot_used() :: :"commanded.snapshot.used"
+  def commanded_snapshot_used, do: :"commanded.snapshot.used"
+
+  @doc """
+  The version the snapshot was taken at.
+  """
+  @spec commanded_snapshot_source_version() :: :"commanded.snapshot.source_version"
+  def commanded_snapshot_source_version, do: :"commanded.snapshot.source_version"
+
+  @doc """
+  The configured snapshot_every value (events between snapshots).
+  """
+  @spec commanded_snapshot_every() :: :"commanded.snapshot.every"
+  def commanded_snapshot_every, do: :"commanded.snapshot.every"
+
+  @doc """
+  The configured snapshot module version.
+  """
+  @spec commanded_snapshot_module_version() :: :"commanded.snapshot.module_version"
+  def commanded_snapshot_module_version, do: :"commanded.snapshot.module_version"
 end
