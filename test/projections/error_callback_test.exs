@@ -1,11 +1,9 @@
 defmodule Commanded.Projections.ErrorCallbackTest do
-  use ExUnit.Case
+  use Commanded.MockProjectionCase
 
   import Commanded.Projections.ProjectionAssertions
   import ExUnit.CaptureLog
-  import Mox
 
-  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
   alias Commanded.EventStore.RecordedEvent
 
   alias Commanded.Projections.Events.{
@@ -20,13 +18,6 @@ defmodule Commanded.Projections.ErrorCallbackTest do
   alias Commanded.Projections.Repo
   alias Commanded.UUID
   alias Ecto.Adapters.SQL.Sandbox
-
-  setup [:set_mox_global, :stub_event_store, :verify_on_exit!]
-
-  setup do
-    start_supervised!({TestApplication, event_store: [adapter: MockEventStore]})
-    Sandbox.checkout(Repo)
-  end
 
   describe "error handling" do
     setup [:start_projector]
@@ -145,21 +136,6 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       assert_projections(Projection, ["AnEvent"])
       assert_seen_event("ErrorProjector", 3)
     end
-  end
-
-  defp stub_event_store(_context) do
-    stub(MockEventStore, :ack_event, fn _adapter_meta, _pid, _event -> :ok end)
-
-    stub(MockEventStore, :child_spec, fn _application, _config ->
-      {:ok, [], %{}}
-    end)
-
-    stub(MockEventStore, :subscribe_to, fn
-      _event_store, :all, _handler_name, _handler, _subscribe_from, _opts ->
-        {:ok, self()}
-    end)
-
-    :ok
   end
 
   defp start_projector(_context) do

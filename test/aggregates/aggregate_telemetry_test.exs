@@ -258,22 +258,7 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
     test "emit `[:commanded, :aggregate, :execute, :wrong_expected_version]` event" do
       aggregate_uuid = UUID.uuid4()
 
-      expect(MockEventStore, :subscribe, fn _event_store_meta, aggregate_uuid ->
-        assert is_binary(aggregate_uuid)
-        :ok
-      end)
-
-      expect(MockEventStore, :append_to_stream, fn _meta,
-                                                   ^aggregate_uuid,
-                                                   _exp_ver,
-                                                   _event_data,
-                                                   _opts ->
-        {:error, :wrong_expected_version}
-      end)
-
-      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, _from, _batch_size ->
-        []
-      end)
+      expect_wrong_expected_version_conflict(aggregate_uuid)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: Commanded.MockedApp)
 
@@ -320,11 +305,7 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
     test "load only when stream_forward returns stream_not_found" do
       aggregate_uuid = UUID.uuid4()
 
-      expect(MockEventStore, :subscribe, fn _meta, ^aggregate_uuid -> :ok end)
-
-      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
-        {:error, :stream_not_found}
-      end)
+      expect_stream_not_found(aggregate_uuid)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
 
@@ -339,24 +320,14 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
       aggregate_uuid = UUID.uuid4()
       count = 2
 
-      expect(MockEventStore, :subscribe, fn _meta, ^aggregate_uuid -> :ok end)
-
-      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+      events =
         for i <- 1..count do
-          %Commanded.EventStore.RecordedEvent{
-            event_id: UUID.uuid4(),
-            event_number: i,
-            stream_id: aggregate_uuid,
-            stream_version: i,
-            correlation_id: nil,
-            causation_id: nil,
-            event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event",
-            data: %Event{message: "event#{i}"},
-            metadata: nil,
-            created_at: DateTime.utc_now()
-          }
+          build_recorded_event(aggregate_uuid, i, %Event{message: "event#{i}"},
+            event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event"
+          )
         end
-      end)
+
+      expect_stream_with_events(aggregate_uuid, events)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
 

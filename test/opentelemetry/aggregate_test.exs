@@ -5,7 +5,6 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   alias Commanded.Aggregates.AggregateTelemetryTest
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.DefaultApp
-  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
   alias Commanded.MockedApp
@@ -606,22 +605,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     test "span has wrong_expected_version event when conflict occurs" do
       aggregate_uuid = UUID.uuid4()
 
-      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
-        assert is_binary(aggregate_uuid)
-        :ok
-      end)
-
-      expect(MockEventStore, :append_to_stream, fn _meta,
-                                                   ^aggregate_uuid,
-                                                   _exp_ver,
-                                                   _event_data,
-                                                   _opts ->
-        {:error, :wrong_expected_version}
-      end)
-
-      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, _from, _batch_size ->
-        []
-      end)
+      expect_wrong_expected_version_conflict(aggregate_uuid)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
 
@@ -673,44 +657,15 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     test "span has wrong_expected_version event with count when retry succeeds" do
       aggregate_uuid = UUID.uuid4()
 
-      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
-        assert is_binary(aggregate_uuid)
-        :ok
-      end)
+      event =
+        build_recorded_event(
+          aggregate_uuid,
+          1,
+          struct!(Commanded.Aggregates.AggregateTelemetryTest.Event, message: "event"),
+          event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event"
+        )
 
-      expect(MockEventStore, :append_to_stream, 2, fn
-        _meta, ^aggregate_uuid, 0, _event_data, _opts ->
-          {:error, :wrong_expected_version}
-
-        _meta, ^aggregate_uuid, 1, _event_data, _opts ->
-          :ok
-      end)
-
-      stream_forward_calls = :counters.new(1, [])
-
-      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, 1, _batch_size ->
-        n = :counters.get(stream_forward_calls, 1)
-        :counters.add(stream_forward_calls, 1, 1)
-
-        if n == 0 do
-          []
-        else
-          [
-            %Commanded.EventStore.RecordedEvent{
-              event_id: UUID.uuid4(),
-              event_number: 1,
-              stream_id: aggregate_uuid,
-              stream_version: 1,
-              correlation_id: nil,
-              causation_id: nil,
-              event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event",
-              data: struct!(Commanded.Aggregates.AggregateTelemetryTest.Event, message: "event"),
-              metadata: nil,
-              created_at: DateTime.utc_now()
-            }
-          ]
-        end
-      end)
+      expect_wrong_expected_version_retry_succeeds(aggregate_uuid, event)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
 
@@ -760,21 +715,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     test "no wrong_expected_version event when count is 0" do
       aggregate_uuid = UUID.uuid4()
 
-      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
-        :ok
-      end)
-
-      expect(MockEventStore, :append_to_stream, fn _meta,
-                                                   ^aggregate_uuid,
-                                                   _exp_ver,
-                                                   _event_data,
-                                                   _opts ->
-        :ok
-      end)
-
-      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
-        []
-      end)
+      expect_successful_append_with_empty_stream(aggregate_uuid)
 
       assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
 
