@@ -2,7 +2,7 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
   use Commanded.MockEventStoreCase
 
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
-  alias Commanded.{DefaultApp, UUID}
+  alias Commanded.{DefaultApp, MockedApp, UUID}
 
   defmodule Commands do
     defmodule Ok do
@@ -193,7 +193,30 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
       refute_received {[:commanded, :aggregate, :execute, :stop], _measurements, _metadata}
     end
 
-    test "emit `[:commanded, :aggregate, :populate]` events",
+    test "emit `[:commanded, :aggregate, :load]` events for new aggregate (stream_not_found)",
+         %{aggregate_uuid: aggregate_uuid} do
+      # Setup already started the aggregate. For a new aggregate, stream_forward returns
+      # {:error, :stream_not_found}. Load telemetry fires with count: 0; populate does not fire.
+      assert_receive {[:commanded, :aggregate, :load, :start], _measurements, _metadata}
+      assert_receive {[:commanded, :aggregate, :load, :stop], measurements, metadata}
+
+      assert match?(%{count: 0}, measurements)
+
+      assert match?(
+               %{
+                 aggregate_state: %ExampleAggregate{},
+                 aggregate_uuid: ^aggregate_uuid,
+                 aggregate_version: 0,
+                 application: DefaultApp
+               },
+               metadata
+             )
+
+      refute_received {[:commanded, :aggregate, :populate, :start], _, _}
+      refute_received {[:commanded, :aggregate, :populate, :stop], _, _}
+    end
+
+    test "emit `[:commanded, :aggregate, :load]` and `[:commanded, :aggregate, :populate]` for existing aggregate (reload)",
          %{aggregate_uuid: aggregate_uuid, pid: pid} do
       context = %ExecutionContext{
         command: %Ok{message: "ok"},
@@ -210,13 +233,16 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
 
       Process.exit(pid, :normal)
 
-      # Do the reload, we should now have telemetry
+      # Do the reload. Consume initial load (count: 0) from setup, then reload load + populate.
+      assert_receive {[:commanded, :aggregate, :load, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :load, :stop], %{count: 0}, _}
+
       start_aggregate(aggregate_uuid)
 
-      assert_receive {[:commanded, :aggregate, :populate, :start], _measurements, _metadata}
-      assert_receive {[:commanded, :aggregate, :populate, :stop], measurements, metadata}
-
-      assert match?(%{count: ^count}, measurements)
+      assert_receive {[:commanded, :aggregate, :load, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :populate, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :populate, :stop], %{count: ^count}, metadata}
+      assert_receive {[:commanded, :aggregate, :load, :stop], %{count: ^count}, _}
 
       assert match?(
                %{
@@ -278,6 +304,63 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
     end
   end
 
+  @tag :unit
+  describe "load/populate telemetry (unit: MockedApp + expect)" do
+    setup do
+      attach_telemetry()
+      :ok
+    end
+
+    test "load only when stream_forward returns stream_not_found" do
+      aggregate_uuid = UUID.uuid4()
+
+      expect(MockEventStore, :subscribe, fn _meta, ^aggregate_uuid -> :ok end)
+
+      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+        {:error, :stream_not_found}
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+
+      assert_receive {[:commanded, :aggregate, :load, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :load, :stop], %{count: 0}, _}
+
+      refute_received {[:commanded, :aggregate, :populate, :start], _, _}
+      refute_received {[:commanded, :aggregate, :populate, :stop], _, _}
+    end
+
+    test "load + populate when stream_forward returns events" do
+      aggregate_uuid = UUID.uuid4()
+      count = 2
+
+      expect(MockEventStore, :subscribe, fn _meta, ^aggregate_uuid -> :ok end)
+
+      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+        for i <- 1..count do
+          %Commanded.EventStore.RecordedEvent{
+            event_id: UUID.uuid4(),
+            event_number: i,
+            stream_id: aggregate_uuid,
+            stream_version: i,
+            correlation_id: nil,
+            causation_id: nil,
+            event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event",
+            data: %Event{message: "event#{i}"},
+            metadata: nil,
+            created_at: DateTime.utc_now()
+          }
+        end
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+
+      assert_receive {[:commanded, :aggregate, :load, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :populate, :start], _, _}
+      assert_receive {[:commanded, :aggregate, :populate, :stop], %{count: ^count}, _}
+      assert_receive {[:commanded, :aggregate, :load, :stop], %{count: ^count}, _}
+    end
+  end
+
   def start_aggregate(aggregate_uuid) do
     Aggregate.start_link([application: DefaultApp],
       aggregate_module: ExampleAggregate,
@@ -305,6 +388,8 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
         [:commanded, :aggregate, :execute, :stop],
         [:commanded, :aggregate, :execute, :exception],
         [:commanded, :aggregate, :execute, :wrong_expected_version],
+        [:commanded, :aggregate, :load, :start],
+        [:commanded, :aggregate, :load, :stop],
         [:commanded, :aggregate, :populate, :start],
         [:commanded, :aggregate, :populate, :stop]
       ],
