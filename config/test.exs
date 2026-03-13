@@ -6,6 +6,9 @@ alias Commanded.Serialization.JsonSerializer
 config :logger, level: :info
 config :logger, :console, level: :info, format: "[$level] $message\n"
 
+# Suppress GenServer "terminating" / "killed" logs from expected process teardown during tests
+config :logger, handle_otp_reports: false
+
 config :ex_unit,
   assert_receive_timeout: 1_000,
   capture_log: [level: :debug],
