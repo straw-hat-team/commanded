@@ -1,15 +1,8 @@
 defmodule Commanded.Event.HandlerAfterStartTest do
   use Commanded.MockEventStoreCase
 
-  import Mox
-
-  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
-
   setup do
-    stub(MockEventStore, :subscribe_to, fn
-      _event_store, :all, _handler_name, handler, _subscribe_from, _opts ->
-        {:ok, handler}
-    end)
+    stub_subscribe_to_return_handler()
 
     :ok
   end

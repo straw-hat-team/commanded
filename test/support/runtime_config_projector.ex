@@ -11,4 +11,9 @@ defmodule Commanded.Projections.RuntimeConfigProjector do
 
     Ecto.Multi.insert(multi, :my_projection, %Projection{name: name})
   end)
+
+  def after_update(%AnEvent{name: name, pid: pid}, _metadata, _changes) do
+    send(pid, {:projected, name})
+    :ok
+  end
 end

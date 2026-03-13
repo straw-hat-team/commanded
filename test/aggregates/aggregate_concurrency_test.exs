@@ -3,29 +3,10 @@ defmodule Commanded.Aggregates.AggregateConcurrencyTest do
 
   alias Commanded.MockedApp
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
-  alias Commanded.EventStore.RecordedEvent
   alias Commanded.ExampleDomain.{BankAccount, DepositMoneyHandler, OpenAccountHandler}
   alias Commanded.ExampleDomain.BankAccount.Commands.{DepositMoney, OpenAccount}
   alias Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited
   alias Commanded.UUID
-
-  setup do
-    expect(MockEventStore, :subscribe_to, fn
-      _event_store_meta, stream_uuid, handler_name, handler, _subscribe_from, _opts ->
-        assert is_binary(stream_uuid)
-        assert is_binary(handler_name)
-
-        {:ok, handler}
-    end)
-
-    expect(MockEventStore, :subscribe, fn _event_store_meta, aggregate_uuid ->
-      assert is_binary(aggregate_uuid)
-
-      :ok
-    end)
-
-    :ok
-  end
 
   describe "concurrency error" do
     setup [:open_account]
@@ -46,38 +27,20 @@ defmodule Commanded.Aggregates.AggregateConcurrencyTest do
         retry_attempts: 1
       }
 
-      # Fail to append once
-      expect(MockEventStore, :append_to_stream, fn
-        _event_store_meta, ^account_number, 1, _event_data, _opts ->
-          {:error, :wrong_expected_version}
-      end)
+      concurrent_event =
+        build_recorded_event(
+          account_number,
+          2,
+          %MoneyDeposited{
+            account_number: account_number,
+            transfer_uuid: UUID.uuid4(),
+            amount: 500,
+            balance: 1_500
+          },
+          event_type: "Elixir.Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited"
+        )
 
-      # Return "missing" event
-      expect(MockEventStore, :stream_forward, fn
-        _event_store_meta, ^account_number, 2, _batch_size ->
-          [
-            %RecordedEvent{
-              event_id: UUID.uuid4(),
-              event_number: 2,
-              stream_id: account_number,
-              stream_version: 2,
-              event_type: "Elixir.Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited",
-              data: %MoneyDeposited{
-                account_number: account_number,
-                transfer_uuid: UUID.uuid4(),
-                amount: 500,
-                balance: 1_500
-              },
-              metadata: %{}
-            }
-          ]
-      end)
-
-      # Succeed on second attempt
-      expect(MockEventStore, :append_to_stream, fn
-        _event_store_meta, ^account_number, 2, _event_data, _opts ->
-          :ok
-      end)
+      expect_concurrency_retry_succeeds(account_number, concurrent_event)
 
       assert {:ok, 3, _events, _aggregate_state} =
                Aggregate.execute(MockedApp, BankAccount, account_number, context)
@@ -92,16 +55,7 @@ defmodule Commanded.Aggregates.AggregateConcurrencyTest do
     end
 
     test "should error after too many attempts", %{account_number: account_number} do
-      # Fail to append to stream
-      expect(MockEventStore, :append_to_stream, 6, fn
-        _event_store_meta, ^account_number, 1, _event_data, _opts ->
-          {:error, :wrong_expected_version}
-      end)
-
-      expect(MockEventStore, :stream_forward, 6, fn
-        _event_store_meta, ^account_number, 2, _batch_size ->
-          []
-      end)
+      expect_too_many_retry_attempts(account_number)
 
       command = %DepositMoney{
         account_number: account_number,
@@ -123,15 +77,7 @@ defmodule Commanded.Aggregates.AggregateConcurrencyTest do
     defp open_account(_context) do
       account_number = UUID.uuid4()
 
-      expect(MockEventStore, :stream_forward, fn
-        _event_store_meta, ^account_number, 1, _batch_size ->
-          []
-      end)
-
-      expect(MockEventStore, :append_to_stream, fn
-        _event_store_meta, ^account_number, 0, _event_data, _opts ->
-          :ok
-      end)
+      expect_open_aggregate(account_number)
 
       {:ok, ^account_number} =
         Commanded.Aggregates.Supervisor.open_aggregate(MockedApp, BankAccount, account_number)

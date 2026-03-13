@@ -1,22 +1,13 @@
 defmodule Commanded.Projections.RuntimeConfigProjectorTest do
-  use ExUnit.Case
+  use Commanded.MockProjectionCase
 
-  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.Projections.Events.AnEvent
   alias Commanded.Projections.{Projection, ProjectionAssertions, Repo, RuntimeConfigProjector}
   alias Commanded.UUID
   alias Ecto.Adapters.SQL.Sandbox
 
-  import Mox
   import ProjectionAssertions
-
-  setup [:set_mox_global, :stub_event_store, :verify_on_exit!]
-
-  setup do
-    start_supervised!({TestApplication, event_store: [adapter: MockEventStore]})
-    Sandbox.checkout(Repo)
-  end
 
   describe "runtime config projector" do
     setup do
@@ -47,6 +38,7 @@ defmodule Commanded.Projections.RuntimeConfigProjectorTest do
       ])
 
       assert_receive {:project, "AnEvent"}
+      assert_receive {:projected, "AnEvent"}
 
       assert_projections(Projection, ["AnEvent"])
       assert last_seen_event("RuntimeProjector1") == 1
@@ -56,20 +48,5 @@ defmodule Commanded.Projections.RuntimeConfigProjectorTest do
 
   defp send_events(projector, events) do
     send(projector, {:events, events})
-  end
-
-  defp stub_event_store(_context) do
-    stub(MockEventStore, :ack_event, fn _adapter_meta, _pid, _event -> :ok end)
-
-    stub(MockEventStore, :child_spec, fn _application, _config ->
-      {:ok, [], %{}}
-    end)
-
-    stub(MockEventStore, :subscribe_to, fn
-      _event_store, :all, _handler_name, _handler, _subscribe_from, _opts ->
-        {:ok, self()}
-    end)
-
-    :ok
   end
 end

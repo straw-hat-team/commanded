@@ -1,4 +1,4 @@
-defmodule Commanded.MockEventStoreCase do
+defmodule Commanded.MockProjectionCase do
   @moduledoc false
 
   use ExUnit.CaseTemplate
@@ -6,8 +6,9 @@ defmodule Commanded.MockEventStoreCase do
   import Mox
 
   alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
-  alias Commanded.MockedApp
+  alias Commanded.Projections.Repo
   alias Commanded.TestSupport.MockEventStoreHelpers
+  alias Ecto.Adapters.SQL.Sandbox
 
   using do
     quote do
@@ -18,15 +19,18 @@ defmodule Commanded.MockEventStoreCase do
     end
   end
 
-  setup [:set_mox_global, :stub_event_store]
+  setup [:set_mox_global, :stub_event_store, :verify_on_exit!]
 
   setup do
-    start_supervised!(MockedApp)
+    start_supervised!({TestApplication, event_store: [adapter: MockEventStore]})
+    Sandbox.checkout(Repo)
 
     :ok
   end
 
   def stub_event_store(_context) do
     MockEventStoreHelpers.stub_common_event_store()
+    MockEventStoreHelpers.stub_subscribe_to_for_projections()
+    :ok
   end
 end
