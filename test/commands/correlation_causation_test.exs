@@ -10,7 +10,6 @@ defmodule Commanded.Commands.CorrelationCasuationTest do
   alias Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited
   alias Commanded.ExampleDomain.BankRouter
   alias Commanded.Helpers.CommandAuditMiddleware
-  alias Commanded.Helpers.ProcessHelper
   alias Commanded.UUID
 
   setup do
@@ -146,11 +145,8 @@ defmodule Commanded.Commands.CorrelationCasuationTest do
     end
 
     def start_account_bonus_handler(_context) do
-      {:ok, handler} = OpenAccountBonusHandler.start_link()
-
-      on_exit(fn ->
-        ProcessHelper.shutdown(handler)
-      end)
+      _handler = start_supervised!(OpenAccountBonusHandler)
+      :ok
     end
   end
 end

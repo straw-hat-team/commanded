@@ -29,7 +29,8 @@ defmodule Commanded.Aggregates.Aggregate do
       caller: pid(),
       execution_context: Commanded.Aggregates.ExecutionContext.t(),
       events: [map()],
-      error: nil | any()}
+      error: nil | any(),
+      wrong_expected_version_count: non_neg_integer()}
     """
   })
 
@@ -194,7 +195,8 @@ defmodule Commanded.Aggregates.Aggregate do
     :aggregate_state,
     :snapshotting,
     aggregate_version: 0,
-    lifespan_timeout: :infinity
+    lifespan_timeout: :infinity,
+    wrong_expected_version_count: 0
   ]
 
   def start_link(config, opts) do
@@ -372,6 +374,7 @@ defmodule Commanded.Aggregates.Aggregate do
   def handle_call({:execute_command, %ExecutionContext{} = context}, from, %Aggregate{} = state) do
     %ExecutionContext{lifespan: lifespan, command: command} = context
 
+    state = %Aggregate{state | wrong_expected_version_count: 0}
     telemetry_metadata = telemetry_metadata(context, from, state)
     start_time = telemetry_start(telemetry_metadata)
 
@@ -623,6 +626,11 @@ defmodule Commanded.Aggregates.Aggregate do
       {:error, :wrong_expected_version} ->
         telemetry_wrong_expected_version(context, from, state)
 
+        state = %Aggregate{
+          state
+          | wrong_expected_version_count: state.wrong_expected_version_count + 1
+        }
+
         # Fetch missing events from event store
         state = AggregateStateBuilder.rebuild_from_events(state)
 
@@ -750,7 +758,8 @@ defmodule Commanded.Aggregates.Aggregate do
       application: application,
       aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
-      aggregate_version: aggregate_version
+      aggregate_version: aggregate_version,
+      wrong_expected_version_count: wrong_expected_version_count
     } = state
 
     {pid, _ref} = from
@@ -761,7 +770,8 @@ defmodule Commanded.Aggregates.Aggregate do
       aggregate_state: aggregate_state,
       aggregate_version: aggregate_version,
       caller: pid,
-      execution_context: context
+      execution_context: context,
+      wrong_expected_version_count: wrong_expected_version_count
     }
   end
 

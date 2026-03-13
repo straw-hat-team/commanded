@@ -301,6 +301,11 @@ defmodule Commanded.Aggregates.AggregateTelemetryTest do
       assert metadata.caller == self()
       assert metadata.execution_context.command == %Ok{message: "ok"}
       assert metadata.execution_context.retry_attempts == 0
+
+      assert_receive {[:commanded, :aggregate, :execute, :stop], _stop_measurements,
+                      stop_metadata}
+
+      assert stop_metadata.wrong_expected_version_count == 1
     end
   end
 
