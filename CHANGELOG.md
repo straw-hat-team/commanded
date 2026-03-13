@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.4.0](https://github.com/straw-hat-team/commanded/compare/v3.3.2...v3.4.0) (2026-03-13)
+
+
+### Features
+
+* Add OpenTelemetry support for aggregate snapshots ([#60](https://github.com/straw-hat-team/commanded/issues/60)) ([d651288](https://github.com/straw-hat-team/commanded/commit/d651288ad026ff9f08becbdde6203861350bc2ff))
+* Add wrong_expected_version span event to aggregate execute OTel ([#61](https://github.com/straw-hat-team/commanded/issues/61)) ([f1f8b1b](https://github.com/straw-hat-team/commanded/commit/f1f8b1ba82a55a5a9e429e2218f4d63c548612eb))
+
+
+### Bug Fixes
+
+* Emit populate telemetry for new aggregates (stream_not_found) ([#58](https://github.com/straw-hat-team/commanded/issues/58)) ([1af575a](https://github.com/straw-hat-team/commanded/commit/1af575a28722585a6375c309b27e8d905014b273))
+
 ## [3.3.2](https://github.com/straw-hat-team/commanded/compare/v3.3.1...v3.3.2) (2026-02-27)
 
 
