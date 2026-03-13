@@ -8,8 +8,33 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   alias Commanded.Telemetry
 
   telemetry_event(%{
+    event: [:commanded, :aggregate, :load, :start],
+    description:
+      "Emitted when an aggregate begins loading from the event store (stream_forward + consumption)",
+    measurements: "%{system_time: integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_state: struct(),
+      aggregate_version: non_neg_integer()}
+    """
+  })
+
+  telemetry_event(%{
+    event: [:commanded, :aggregate, :load, :stop],
+    description: "Emitted when an aggregate completes loading from the event store",
+    measurements: "%{duration: non_neg_integer(), count: non_neg_integer()}",
+    metadata: """
+    %{application: Commanded.Application.t(),
+      aggregate_uuid: String.t(),
+      aggregate_state: struct(),
+      aggregate_version: non_neg_integer()}
+    """
+  })
+
+  telemetry_event(%{
     event: [:commanded, :aggregate, :populate, :start],
-    description: "Emitted when an aggregate begins loading from the event store",
+    description: "Emitted when an aggregate begins applying events to rebuild state",
     measurements: "%{system_time: integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
@@ -21,7 +46,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
 
   telemetry_event(%{
     event: [:commanded, :aggregate, :populate, :stop],
-    description: "Emitted when an aggregate completes loading from the event store",
+    description: "Emitted when an aggregate completes applying events to rebuild state",
     measurements: "%{duration: non_neg_integer(), count: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
@@ -65,25 +90,35 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   Load events from the event store, in batches, to rebuild the aggregate state
   """
   def rebuild_from_events(%Aggregate{} = state) do
+    load_prefix = [:commanded, :aggregate, :load]
+    load_start = Telemetry.start(load_prefix, telemetry_metadata(state))
+
     %Aggregate{
       application: application,
       aggregate_uuid: aggregate_uuid,
       aggregate_version: aggregate_version
     } = state
 
-    case EventStore.stream_forward(
-           application,
-           aggregate_uuid,
-           aggregate_version + 1,
-           @read_event_batch_size
-         ) do
-      {:error, :stream_not_found} ->
-        # aggregate does not exist, return initial state
-        state
+    result =
+      case EventStore.stream_forward(
+             application,
+             aggregate_uuid,
+             aggregate_version + 1,
+             @read_event_batch_size
+           ) do
+        {:error, :stream_not_found} ->
+          # aggregate does not exist, return initial state
+          Telemetry.stop(load_prefix, load_start, telemetry_metadata(state), %{count: 0})
+          {state, 0}
 
-      event_stream ->
-        rebuild_from_event_stream(event_stream, state)
-    end
+        event_stream ->
+          {state, count} = rebuild_from_event_stream(event_stream, state)
+          Telemetry.stop(load_prefix, load_start, telemetry_metadata(state), %{count: count})
+          {state, count}
+      end
+
+    {state, _count} = result
+    state
   end
 
   # Rebuild aggregate state from a `Stream` of its events.
@@ -107,7 +142,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
 
     Telemetry.stop(telemetry_prefix, start_time, telemetry_metadata(state), %{count: count})
 
-    state
+    {state, count}
   end
 
   defp telemetry_metadata(%Aggregate{} = state) do

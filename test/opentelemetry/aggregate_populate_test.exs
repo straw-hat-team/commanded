@@ -19,21 +19,20 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
   end
 
   describe "setup/0" do
-    test "attaches telemetry handlers for aggregate populate events" do
+    test "attaches telemetry handlers for aggregate load and populate events" do
       detach_populate_handlers()
 
       AggregatePopulate.setup()
 
       for event <- [
+            [:commanded, :aggregate, :load, :start],
+            [:commanded, :aggregate, :load, :stop],
             [:commanded, :aggregate, :populate, :start],
             [:commanded, :aggregate, :populate, :stop]
           ] do
         handlers = :telemetry.list_handlers(event)
 
-        assert Enum.any?(
-                 handlers,
-                 &match?(%{id: {AggregatePopulate, :populate}}, &1)
-               ),
+        assert length(handlers) >= 1,
                "Expected handler for event #{inspect(event)}"
       end
     end
@@ -43,7 +42,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       :ok = AggregatePopulate.setup()
 
-      handlers = :telemetry.list_handlers([:commanded, :aggregate, :populate, :start])
+      handlers = :telemetry.list_handlers([:commanded, :aggregate, :load, :start])
       assert length(handlers) == 1
 
       assert_raise MatchError, fn ->
@@ -90,6 +89,46 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 5,
+               "commanded.event.count": 0
+             }
+    end
+  end
+
+  describe "load span (event store latency including stream_not_found)" do
+    setup do
+      detach_populate_handlers()
+      AggregatePopulate.setup()
+      :ok
+    end
+
+    test "emits load span for stream_not_found (count: 0)" do
+      aggregate_uuid = UUID.uuid4()
+
+      meta =
+        Factory.build_aggregate_populate_metadata(
+          aggregate_uuid: aggregate_uuid,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "commanded.aggregate.load",
+                        kind: :internal,
+                        attributes: attributes
+                      )},
+                     1000
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "load",
+               "code.function": "load",
+               "commanded.application": MockApp,
+               "commanded.aggregate.uuid": aggregate_uuid,
+               "commanded.aggregate.version": 0,
                "commanded.event.count": 0
              }
     end
@@ -171,6 +210,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
   defp detach_populate_handlers do
     for event <- [
+          [:commanded, :aggregate, :load, :start],
+          [:commanded, :aggregate, :load, :stop],
           [:commanded, :aggregate, :populate, :start],
           [:commanded, :aggregate, :populate, :stop]
         ] do

@@ -218,11 +218,11 @@ end
 With a dedicated protocol, the API response format and the event store stream ID format are properly separated and can evolve independently.
 
 ### **OpenTelemetry Integration**
-PRs: [#37](https://github.com/straw-hat-team/commanded/pull/37), [#41](https://github.com/straw-hat-team/commanded/pull/41), [#45](https://github.com/straw-hat-team/commanded/pull/45), [#46](https://github.com/straw-hat-team/commanded/pull/46), [#47](https://github.com/straw-hat-team/commanded/pull/47)
+PRs: [#37](https://github.com/straw-hat-team/commanded/pull/37), [#41](https://github.com/straw-hat-team/commanded/pull/41), [#45](https://github.com/straw-hat-team/commanded/pull/45), [#46](https://github.com/straw-hat-team/commanded/pull/46), [#47](https://github.com/straw-hat-team/commanded/pull/47), [#58](https://github.com/straw-hat-team/commanded/pull/58)
 
 **Changes:**
 - Added `Commanded.OpenTelemetry` module for distributed tracing
-- Creates spans for event handlers (PR #41), EventStore operations (PR #37), aggregate execution (PR #45), application dispatch (PR #46), and aggregate populate (PR #47)
+- Creates spans for event handlers (PR #41), EventStore operations (PR #37), aggregate execution (PR #45), application dispatch (PR #46), aggregate load (PR #58), and aggregate populate (PR #47)
 - Added `opentelemetry_api`, `opentelemetry_telemetry`, and `opentelemetry_semantic_conventions` as required dependencies
 
 **Usage:**
@@ -243,3 +243,17 @@ end
 - Visualize event handler execution in your tracing backend
 - Correlate event processing with command dispatch using span links
 - Configurable span relationships (`:link`, `:child`, `:none`)
+
+### **Aggregate Load Telemetry**
+
+[PR #58](https://github.com/straw-hat-team/commanded/pull/58)
+
+**Changes:**
+- Added `[:commanded, :aggregate, :load]` telemetry for full event store load (stream_forward + consumption)
+- Load spans fire for both new aggregates (`stream_not_found`, `count: 0`) and existing aggregates
+- Populate spans remain unchanged: only fire when applying events to rebuild state
+- Trace hierarchy: `commanded.aggregate.load` (parent) → `commanded.aggregate.populate` (child, when events exist)
+
+**Benefits:**
+- Measure event store read latency as a whole, including the "not found" case
+- Separate load (event store I/O) from populate (state rebuild) in traces
