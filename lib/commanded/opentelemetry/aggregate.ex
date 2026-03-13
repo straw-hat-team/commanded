@@ -96,6 +96,17 @@ defmodule Commanded.OpenTelemetry.Aggregate do
       Span.set_status(ctx, OpenTelemetry.status(:error, Helpers.format_error(error)))
     end
 
+    wrong_expected_version_count = Map.get(meta, :wrong_expected_version_count, 0)
+
+    if wrong_expected_version_count > 0 do
+      Span.add_event(ctx, "commanded.aggregate.wrong_expected_version", [
+        {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version},
+        {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
+        {CommandedAttributes.commanded_wrong_expected_version_count(),
+         wrong_expected_version_count}
+      ])
+    end
+
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 

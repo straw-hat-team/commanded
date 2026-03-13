@@ -1,10 +1,15 @@
 defmodule Commanded.OpenTelemetry.AggregateTest do
   use Commanded.OpenTelemetryCase, async: false
+  use Commanded.MockEventStoreCase
 
+  alias Commanded.Aggregates.AggregateTelemetryTest
+  alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.DefaultApp
+  alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
-  alias Commanded.OpenTelemetry.Aggregate
+  alias Commanded.MockedApp
+  alias Commanded.OpenTelemetry.Aggregate, as: OTelAggregate
   alias Commanded.OpenTelemetry.TestRouter
   alias Commanded.TestSupport.Factory
   alias Commanded.UUID
@@ -18,7 +23,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
     detach_handlers()
     detach_event_store_handlers()
-    Aggregate.setup()
+    OTelAggregate.setup()
 
     :ok
   end
@@ -27,7 +32,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     test "attaches telemetry handlers for aggregate execute events" do
       detach_handlers()
 
-      Aggregate.setup()
+      OTelAggregate.setup()
 
       for event <- [
             [:commanded, :aggregate, :execute, :start],
@@ -38,7 +43,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
         assert Enum.any?(
                  handlers,
-                 &match?(%{id: {Aggregate, :execute}}, &1)
+                 &match?(%{id: {OTelAggregate, :execute}}, &1)
                ),
                "Expected handler for event #{inspect(event)}"
       end
@@ -47,13 +52,13 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
     test "calling setup twice raises MatchError (fail fast)" do
       detach_handlers()
 
-      :ok = Aggregate.setup()
+      :ok = OTelAggregate.setup()
 
       handlers = :telemetry.list_handlers([:commanded, :aggregate, :execute, :start])
       assert length(handlers) == 1
 
       assert_raise MatchError, fn ->
-        Aggregate.setup()
+        OTelAggregate.setup()
       end
     end
   end
@@ -61,7 +66,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   describe "attribute completeness" do
     setup do
       detach_handlers()
-      Aggregate.setup()
+      OTelAggregate.setup()
       :ok
     end
 
@@ -260,7 +265,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   describe "error handling" do
     setup do
       detach_handlers()
-      Aggregate.setup()
+      OTelAggregate.setup()
       :ok
     end
 
@@ -409,7 +414,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   describe "trace context propagation" do
     setup do
       detach_handlers()
-      Aggregate.setup()
+      OTelAggregate.setup()
       :ok
     end
 
@@ -537,7 +542,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   describe "edge cases" do
     setup do
       detach_handlers()
-      Aggregate.setup()
+      OTelAggregate.setup()
       :ok
     end
 
@@ -595,6 +600,230 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.event.count": 0
              }
     end
+  end
+
+  describe "wrong_expected_version span event" do
+    test "span has wrong_expected_version event when conflict occurs" do
+      aggregate_uuid = UUID.uuid4()
+
+      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
+        assert is_binary(aggregate_uuid)
+        :ok
+      end)
+
+      expect(MockEventStore, :append_to_stream, fn _meta,
+                                                   ^aggregate_uuid,
+                                                   _exp_ver,
+                                                   _event_data,
+                                                   _opts ->
+        {:error, :wrong_expected_version}
+      end)
+
+      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+        []
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+
+      assert {:error, :too_many_attempts} =
+               Aggregate.execute(
+                 MockedApp,
+                 AggregateTelemetryTest.ExampleAggregate,
+                 aggregate_uuid,
+                 %ExecutionContext{
+                   command:
+                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                       message: "ok"
+                     ),
+                   function: :execute,
+                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   retry_attempts: 0
+                 }
+               )
+
+      assert_receive {:span,
+                      span(
+                        name:
+                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                        kind: :consumer,
+                        events: events
+                      )},
+                     1000
+
+      events_list = :otel_events.list(events)
+
+      wrong_version_event =
+        Enum.find(events_list, fn event ->
+          elem(event, 2) == "commanded.aggregate.wrong_expected_version"
+        end)
+
+      assert wrong_version_event != nil,
+             "Expected span to contain commanded.aggregate.wrong_expected_version event, got: #{inspect(events_list)}"
+
+      {:event, _timestamp, "commanded.aggregate.wrong_expected_version", attrs_tuple} =
+        wrong_version_event
+
+      {:attributes, _, _, _, attrs_map} = attrs_tuple
+
+      assert attrs_map[:"commanded.aggregate.uuid"] == aggregate_uuid
+      assert attrs_map[:"commanded.aggregate.version"] == 0
+      assert attrs_map[:"commanded.wrong_expected_version.count"] == 1
+    end
+
+    test "span has wrong_expected_version event with count when retry succeeds" do
+      aggregate_uuid = UUID.uuid4()
+
+      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
+        assert is_binary(aggregate_uuid)
+        :ok
+      end)
+
+      expect(MockEventStore, :append_to_stream, 2, fn
+        _meta, ^aggregate_uuid, 0, _event_data, _opts ->
+          {:error, :wrong_expected_version}
+
+        _meta, ^aggregate_uuid, 1, _event_data, _opts ->
+          :ok
+      end)
+
+      stream_forward_calls = :counters.new(1, [])
+
+      expect(MockEventStore, :stream_forward, 2, fn _meta, ^aggregate_uuid, 1, _batch_size ->
+        n = :counters.get(stream_forward_calls, 1)
+        :counters.add(stream_forward_calls, 1, 1)
+
+        if n == 0 do
+          []
+        else
+          [
+            %Commanded.EventStore.RecordedEvent{
+              event_id: UUID.uuid4(),
+              event_number: 1,
+              stream_id: aggregate_uuid,
+              stream_version: 1,
+              correlation_id: nil,
+              causation_id: nil,
+              event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event",
+              data: struct!(Commanded.Aggregates.AggregateTelemetryTest.Event, message: "event"),
+              metadata: nil,
+              created_at: DateTime.utc_now()
+            }
+          ]
+        end
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+
+      assert {:ok, 2, _events, _aggregate_state} =
+               Aggregate.execute(
+                 MockedApp,
+                 AggregateTelemetryTest.ExampleAggregate,
+                 aggregate_uuid,
+                 %ExecutionContext{
+                   command:
+                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                       message: "ok"
+                     ),
+                   function: :execute,
+                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   retry_attempts: 1
+                 }
+               )
+
+      assert_receive {:span,
+                      span(
+                        name:
+                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                        kind: :consumer,
+                        events: events
+                      )},
+                     1000
+
+      events_list = :otel_events.list(events)
+
+      wrong_version_event =
+        Enum.find(events_list, fn event ->
+          elem(event, 2) == "commanded.aggregate.wrong_expected_version"
+        end)
+
+      assert wrong_version_event != nil,
+             "Expected span to contain commanded.aggregate.wrong_expected_version event, got: #{inspect(events_list)}"
+
+      {:event, _timestamp, "commanded.aggregate.wrong_expected_version", attrs_tuple} =
+        wrong_version_event
+
+      {:attributes, _, _, _, attrs_map} = attrs_tuple
+
+      assert attrs_map[:"commanded.wrong_expected_version.count"] == 1
+    end
+
+    test "no wrong_expected_version event when count is 0" do
+      aggregate_uuid = UUID.uuid4()
+
+      expect(MockEventStore, :subscribe, fn _event_store_meta, ^aggregate_uuid ->
+        :ok
+      end)
+
+      expect(MockEventStore, :append_to_stream, fn _meta,
+                                                   ^aggregate_uuid,
+                                                   _exp_ver,
+                                                   _event_data,
+                                                   _opts ->
+        :ok
+      end)
+
+      expect(MockEventStore, :stream_forward, fn _meta, ^aggregate_uuid, _from, _batch_size ->
+        []
+      end)
+
+      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+
+      assert {:ok, 1, _events, _aggregate_state} =
+               Aggregate.execute(
+                 MockedApp,
+                 AggregateTelemetryTest.ExampleAggregate,
+                 aggregate_uuid,
+                 %ExecutionContext{
+                   command:
+                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                       message: "ok"
+                     ),
+                   function: :execute,
+                   handler: AggregateTelemetryTest.ExampleAggregate
+                 }
+               )
+
+      assert_receive {:span,
+                      span(
+                        name:
+                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                        kind: :consumer,
+                        events: events
+                      )},
+                     1000
+
+      events_list = :otel_events.list(events)
+
+      wrong_version_event =
+        Enum.find(events_list, fn event ->
+          elem(event, 2) == "commanded.aggregate.wrong_expected_version"
+        end)
+
+      assert wrong_version_event == nil,
+             "Expected no commanded.aggregate.wrong_expected_version event when count is 0, got: #{inspect(events_list)}"
+    end
+  end
+
+  defp start_aggregate(aggregate_uuid, opts) do
+    aggregate = AggregateTelemetryTest.ExampleAggregate
+    app = Keyword.fetch!(opts, :application)
+    name = Aggregate.name(app, aggregate, aggregate_uuid)
+
+    Aggregate.start_link([application: app],
+      aggregate_module: aggregate,
+      aggregate_uuid: aggregate_uuid,
+      name: Commanded.Registration.via_tuple(app, name)
+    )
   end
 
   defp encode_traceparent(span_ctx) do

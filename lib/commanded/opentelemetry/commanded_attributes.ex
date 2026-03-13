@@ -165,4 +165,10 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   """
   @spec commanded_snapshot_module_version() :: :"commanded.snapshot.module_version"
   def commanded_snapshot_module_version, do: :"commanded.snapshot.module_version"
+
+  @doc """
+  Number of wrong_expected_version conflicts during a single command execution.
+  """
+  @spec commanded_wrong_expected_version_count() :: :"commanded.wrong_expected_version.count"
+  def commanded_wrong_expected_version_count, do: :"commanded.wrong_expected_version.count"
 end

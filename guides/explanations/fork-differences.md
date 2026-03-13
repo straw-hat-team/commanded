@@ -218,11 +218,11 @@ end
 With a dedicated protocol, the API response format and the event store stream ID format are properly separated and can evolve independently.
 
 ### **OpenTelemetry Integration**
-PRs: [#37](https://github.com/straw-hat-team/commanded/pull/37), [#41](https://github.com/straw-hat-team/commanded/pull/41), [#45](https://github.com/straw-hat-team/commanded/pull/45), [#46](https://github.com/straw-hat-team/commanded/pull/46), [#47](https://github.com/straw-hat-team/commanded/pull/47), [#58](https://github.com/straw-hat-team/commanded/pull/58)
+PRs: [#37](https://github.com/straw-hat-team/commanded/pull/37), [#41](https://github.com/straw-hat-team/commanded/pull/41), [#45](https://github.com/straw-hat-team/commanded/pull/45), [#46](https://github.com/straw-hat-team/commanded/pull/46), [#47](https://github.com/straw-hat-team/commanded/pull/47), [#58](https://github.com/straw-hat-team/commanded/pull/58), [#60](https://github.com/straw-hat-team/commanded/pull/60), [#61](https://github.com/straw-hat-team/commanded/pull/61)
 
 **Changes:**
 - Added `Commanded.OpenTelemetry` module for distributed tracing
-- Creates spans for event handlers (PR #41), EventStore operations (PR #37), aggregate execution (PR #45), application dispatch (PR #46), aggregate load (PR #58), and aggregate populate (PR #47)
+- Creates spans for event handlers (PR #41), EventStore operations (PR #37), aggregate execution (PR #45), application dispatch (PR #46), aggregate load (PR #58), aggregate populate (PR #47), aggregate snapshots (PR #60), and wrong_expected_version span event (PR #61)
 - Added `opentelemetry_api`, `opentelemetry_telemetry`, and `opentelemetry_semantic_conventions` as required dependencies
 
 **Usage:**
@@ -257,3 +257,18 @@ end
 **Benefits:**
 - Measure event store read latency as a whole, including the "not found" case
 - Separate load (event store I/O) from populate (state rebuild) in traces
+
+### **OpenTelemetry Aggregate Snapshots**
+[PR #60](https://github.com/straw-hat-team/commanded/pull/60)
+
+**Changes:**
+- Added OTel spans for aggregate snapshot operations (`commanded.aggregate.snapshot`)
+- Spans fire when taking snapshots during aggregate execution
+
+### **OpenTelemetry wrong_expected_version Span Event**
+[PR #61](https://github.com/straw-hat-team/commanded/pull/61)
+
+**Changes:**
+- Track `wrong_expected_version_count` in aggregate struct and `:stop` telemetry metadata
+- OTel execute span records `commanded.aggregate.wrong_expected_version` event when count > 0
+- Enables alerting on optimistic concurrency conflicts via telemetry
