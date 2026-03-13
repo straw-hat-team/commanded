@@ -38,6 +38,7 @@ defmodule Commanded.OpenTelemetry do
 
   alias Commanded.OpenTelemetry.Aggregate
   alias Commanded.OpenTelemetry.AggregatePopulate
+  alias Commanded.OpenTelemetry.AggregateSnapshot
   alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler
   alias Commanded.OpenTelemetry.EventStore
@@ -64,6 +65,11 @@ defmodule Commanded.OpenTelemetry do
                      type: {:in, [:disabled, []]},
                      default: [],
                      doc: "Aggregate populate tracing configuration. Use `:disabled` to disable."
+                   ],
+                   aggregate_snapshot: [
+                     type: {:in, [:disabled, []]},
+                     default: [],
+                     doc: "Aggregate snapshot tracing configuration. Use `:disabled` to disable."
                    ],
                    application: [
                      type: {:in, [:disabled, []]},
@@ -120,6 +126,9 @@ defmodule Commanded.OpenTelemetry do
       # Disable aggregate populate tracing
       Commanded.OpenTelemetry.setup(aggregate_populate: :disabled)
 
+      # Disable aggregate snapshot tracing
+      Commanded.OpenTelemetry.setup(aggregate_snapshot: :disabled)
+
       # Disable event store tracing
       Commanded.OpenTelemetry.setup(event_store: :disabled)
 
@@ -139,6 +148,11 @@ defmodule Commanded.OpenTelemetry do
     case opts[:aggregate_populate] do
       :disabled -> :ok
       _config -> AggregatePopulate.setup()
+    end
+
+    case opts[:aggregate_snapshot] do
+      :disabled -> :ok
+      _config -> AggregateSnapshot.setup()
     end
 
     case opts[:application] do

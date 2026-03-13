@@ -28,7 +28,9 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     %{application: Commanded.Application.t(),
       aggregate_uuid: String.t(),
       aggregate_state: struct(),
-      aggregate_version: non_neg_integer()}
+      aggregate_version: non_neg_integer(),
+      snapshot_used: boolean(),
+      snapshot_source_version: non_neg_integer() | nil}
     """
   })
 
@@ -69,29 +71,48 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   def populate(%Aggregate{} = state) do
     %Aggregate{aggregate_module: aggregate_module, snapshotting: snapshotting} = state
 
-    aggregate =
+    {aggregate, snapshot_used, snapshot_source_version} =
       case Snapshotting.read_snapshot(snapshotting) do
         {:ok, %SnapshotData{source_version: source_version, data: data}} ->
-          %Aggregate{
+          agg = %Aggregate{
             state
             | aggregate_version: source_version,
               aggregate_state: data
           }
 
+          {agg, true, source_version}
+
         {:error, _error} ->
-          # No snapshot present, or exists but for outdated state, so use initial empty state
-          %Aggregate{state | aggregate_version: 0, aggregate_state: struct(aggregate_module)}
+          agg = %Aggregate{
+            state
+            | aggregate_version: 0,
+              aggregate_state: struct(aggregate_module)
+          }
+
+          {agg, false, nil}
       end
 
-    rebuild_from_events(aggregate)
+    rebuild_from_events(aggregate,
+      snapshot_used: snapshot_used,
+      snapshot_source_version: snapshot_source_version
+    )
   end
 
   @doc """
-  Load events from the event store, in batches, to rebuild the aggregate state
+  Load events from the event store, in batches, to rebuild the aggregate state.
+
+  ## Options
+
+  * `:snapshot_used` - whether a snapshot was used as initial state (default: `false`)
+  * `:snapshot_source_version` - version of the snapshot, if used (default: `nil`)
   """
-  def rebuild_from_events(%Aggregate{} = state) do
+  def rebuild_from_events(%Aggregate{} = state, opts \\ []) do
+    snapshot_used = Keyword.get(opts, :snapshot_used, false)
+    snapshot_source_version = Keyword.get(opts, :snapshot_source_version)
+
     load_prefix = [:commanded, :aggregate, :load]
-    load_start = Telemetry.start(load_prefix, telemetry_metadata(state))
+    meta = telemetry_metadata(state)
+    load_start = Telemetry.start(load_prefix, meta)
 
     %Aggregate{
       application: application,
@@ -107,13 +128,25 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
              @read_event_batch_size
            ) do
         {:error, :stream_not_found} ->
-          # aggregate does not exist, return initial state
-          Telemetry.stop(load_prefix, load_start, telemetry_metadata(state), %{count: 0})
+          Telemetry.stop(
+            load_prefix,
+            load_start,
+            load_stop_metadata(state, snapshot_used, snapshot_source_version),
+            %{count: 0}
+          )
+
           {state, 0}
 
         event_stream ->
           {state, count} = rebuild_from_event_stream(event_stream, state)
-          Telemetry.stop(load_prefix, load_start, telemetry_metadata(state), %{count: count})
+
+          Telemetry.stop(
+            load_prefix,
+            load_start,
+            load_stop_metadata(state, snapshot_used, snapshot_source_version),
+            %{count: count}
+          )
+
           {state, count}
       end
 
@@ -143,6 +176,14 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     Telemetry.stop(telemetry_prefix, start_time, telemetry_metadata(state), %{count: count})
 
     {state, count}
+  end
+
+  defp load_stop_metadata(aggregate, snapshot_used, snapshot_source_version) do
+    telemetry_metadata(aggregate)
+    |> Map.merge(%{
+      snapshot_used: snapshot_used,
+      snapshot_source_version: snapshot_source_version
+    })
   end
 
   defp telemetry_metadata(%Aggregate{} = state) do

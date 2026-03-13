@@ -67,6 +67,20 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
       meta.aggregate_version
     )
 
+    Span.set_attribute(
+      ctx,
+      CommandedAttributes.commanded_snapshot_used(),
+      meta[:snapshot_used] || false
+    )
+
+    if snapshot_source_version = meta[:snapshot_source_version] do
+      Span.set_attribute(
+        ctx,
+        CommandedAttributes.commanded_snapshot_source_version(),
+        snapshot_source_version
+      )
+    end
+
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 

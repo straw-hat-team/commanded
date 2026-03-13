@@ -111,7 +111,15 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
         )
 
       :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
-      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: false,
+          snapshot_source_version: nil,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
 
       assert_receive {:span,
                       span(
@@ -129,8 +137,43 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
-               "commanded.event.count": 0
+               "commanded.event.count": 0,
+               "commanded.snapshot.used": false
              }
+    end
+
+    test "emits load span with snapshot attributes when snapshot was used" do
+      aggregate_uuid = UUID.uuid4()
+
+      meta =
+        Factory.build_aggregate_populate_metadata(
+          aggregate_uuid: aggregate_uuid,
+          aggregate_version: 5
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: true,
+          snapshot_source_version: 5,
+          aggregate_version: 5
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "commanded.aggregate.load",
+                        kind: :internal,
+                        attributes: attributes
+                      )},
+                     1000
+
+      attrs = :otel_attributes.map(attributes)
+
+      assert attrs[:"commanded.snapshot.used"] == true
+      assert attrs[:"commanded.snapshot.source_version"] == 5
     end
   end
 
