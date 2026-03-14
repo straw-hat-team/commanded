@@ -541,24 +541,29 @@ defmodule Commanded.Commands.Router do
                     [middleware | acc]
                   end)
 
-      Enum.reduce(@registered_commands, %{}, fn {command_module, command_opts}, acc ->
-        aggregate = Keyword.fetch!(command_opts, :aggregate)
-        initial_state = Keyword.get(command_opts, :initial_state)
+      @registered_commands
+      |> Enum.group_by(
+        fn {_command_module, opts} -> Keyword.fetch!(opts, :aggregate) end,
+        fn {command_module, opts} -> {command_module, Keyword.get(opts, :initial_state)} end
+      )
+      |> Enum.each(fn {aggregate, commands_with_state} ->
+        commands_with_state
+        |> Enum.map(&elem(&1, 1))
+        |> Enum.uniq()
+        |> case do
+          [_] ->
+            :ok
 
-        case Map.fetch(acc, aggregate) do
-          :error ->
-            Map.put(acc, aggregate, initial_state)
+          _ ->
+            [{conflicting_command, conflicting_state} | _] = commands_with_state
+            [{_, existing_state} | _] = Enum.reverse(commands_with_state)
 
-          {:ok, ^initial_state} ->
-            acc
-
-          {:ok, existing_initial_state} ->
             raise ArgumentError, """
             aggregate #{inspect(aggregate)} must use the same `:initial_state` option across all dispatched commands.
 
-            Existing `:initial_state`: #{inspect(existing_initial_state)}
-            Conflicting command: #{inspect(command_module)}
-            Conflicting `:initial_state`: #{inspect(initial_state)}
+            Existing `:initial_state`: #{inspect(existing_state)}
+            Conflicting command: #{inspect(conflicting_command)}
+            Conflicting `:initial_state`: #{inspect(conflicting_state)}
             """
         end
       end)
