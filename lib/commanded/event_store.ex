@@ -57,16 +57,40 @@ defmodule Commanded.EventStore do
 
   @doc """
   Streams events from the given stream, in the order in which they were originally written.
+
+  Telemetry `[:commanded, :event_store, :stream_forward, :stop]` (and matching OpenTelemetry
+  spans) fire when enumeration finishes for adapters that return **lazy streams**,
+  so duration reflects read-from-store work. If the adapter returns a **plain list**,
+  `:stop` runs when `stream_forward` returns, as before.
+
+  For `{:error, _}` results, `:stop` still runs immediately after the failed call.
+
+  Adapter resolution and `stream_forward` are covered by the same span: if either raises,
+  `[:commanded, :event_store, :stream_forward, :exception]` is emitted (after `:start`)
+  with `kind`, `reason`, and `stacktrace` metadata, matching `:telemetry.span/3` behaviour.
+
+  Exceptions raised during **enumeration** of a lazy stream (i.e. inside `Enum.to_list/1`
+  or similar) are **not** wrapped by this telemetry — they are the caller's responsibility.
   """
   def stream_forward(application, stream_uuid, start_version \\ 0, read_batch_size \\ 1_000) do
-    meta = %{
+    base_meta = %{
       application: application,
       stream_uuid: stream_uuid,
       start_version: start_version,
       read_batch_size: read_batch_size
     }
 
-    span(:stream_forward, meta, fn ->
+    start_monotonic = :erlang.monotonic_time()
+    system_time = :erlang.system_time()
+    meta = Map.put(base_meta, :telemetry_span_context, make_ref())
+
+    :telemetry.execute(
+      [:commanded, :event_store, :stream_forward, :start],
+      %{monotonic_time: start_monotonic, system_time: system_time},
+      meta
+    )
+
+    try do
       {adapter, adapter_meta} = Application.event_store_adapter(application)
 
       case adapter.stream_forward(
@@ -76,12 +100,21 @@ defmodule Commanded.EventStore do
              read_batch_size
            ) do
         {:error, _error} = error ->
+          stream_forward_stop(start_monotonic, meta)
           error
 
-        stream ->
+        stream when is_list(stream) ->
+          stream_forward_stop(start_monotonic, meta)
           stream
+
+        stream ->
+          wrap_stream_forward_telemetry(stream, meta, start_monotonic)
       end
-    end)
+    catch
+      kind, reason ->
+        stream_forward_exception(start_monotonic, meta, kind, reason, __STACKTRACE__)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
   end
 
   @doc """
@@ -287,5 +320,45 @@ defmodule Commanded.EventStore do
     :telemetry.span([:commanded, :event_store, event], meta, fn ->
       {func.(), meta}
     end)
+  end
+
+  defp stream_forward_stop(start_monotonic, meta) do
+    stop_monotonic = :erlang.monotonic_time()
+
+    :telemetry.execute(
+      [:commanded, :event_store, :stream_forward, :stop],
+      %{
+        duration: stop_monotonic - start_monotonic,
+        monotonic_time: stop_monotonic,
+        system_time: :erlang.system_time()
+      },
+      meta
+    )
+  end
+
+  defp stream_forward_exception(start_monotonic, meta, kind, reason, stacktrace) do
+    stop_monotonic = :erlang.monotonic_time()
+
+    :telemetry.execute(
+      [:commanded, :event_store, :stream_forward, :exception],
+      %{
+        duration: stop_monotonic - start_monotonic,
+        monotonic_time: stop_monotonic,
+        system_time: :erlang.system_time()
+      },
+      Map.merge(meta, %{kind: kind, reason: reason, stacktrace: stacktrace})
+    )
+  end
+
+  # Deferred :stop only; :start was already emitted by stream_forward/4.
+  defp wrap_stream_forward_telemetry(stream, meta, start_monotonic) do
+    Stream.transform(
+      stream,
+      fn -> nil end,
+      fn elem, acc -> {[elem], acc} end,
+      fn _acc ->
+        stream_forward_stop(start_monotonic, meta)
+      end
+    )
   end
 end
