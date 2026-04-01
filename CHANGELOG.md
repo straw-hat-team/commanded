@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/straw-hat-team/commanded/compare/v3.4.0...v3.4.1) (2026-04-01)
+
+
+### Bug Fixes
+
+* **event_store:** Defer stream_forward telemetry until stream consumed ([#64](https://github.com/straw-hat-team/commanded/issues/64)) ([588b801](https://github.com/straw-hat-team/commanded/commit/588b8014c0803b0463ebb8a5dab47492df128e5a))
+
 ## [3.4.0](https://github.com/straw-hat-team/commanded/compare/v3.3.2...v3.4.0) (2026-03-13)
 
 
