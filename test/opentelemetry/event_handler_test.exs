@@ -84,7 +84,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
       recorded_event = meta.recorded_event
 
       :telemetry.span([:commanded, :event, :handle], meta, fn ->
-        {:ok, meta}
+        {:ok, %{processing_latency_ms: 250}, meta}
       end)
 
       assert_receive {:span,
@@ -117,7 +117,8 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.handler.name": "MyApp.Projectors.AccountProjector",
                "commanded.stream.id": recorded_event.stream_id,
                "commanded.stream.version": 7,
-               "commanded.handler.kind": "event_handler"
+               "commanded.handler.kind": "event_handler",
+               "commanded.handler.lag": 250
              }
     end
   end
@@ -141,7 +142,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
         )
 
       :telemetry.span([:commanded, :event, :batch], meta, fn ->
-        {:ok, meta}
+        {:ok, %{processing_latency_ms: 500}, meta}
       end)
 
       assert_receive {:span,
@@ -169,7 +170,8 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.event.count": 100,
                "commanded.handler.kind": "event_handler",
                "commanded.batch.first_event_id": first_event_id,
-               "commanded.batch.last_event_id": last_event_id
+               "commanded.batch.last_event_id": last_event_id,
+               "commanded.handler.lag": 500
              }
     end
   end
