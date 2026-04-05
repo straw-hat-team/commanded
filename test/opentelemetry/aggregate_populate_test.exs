@@ -73,7 +73,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.populate",
+                        name: "populate MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -85,7 +85,9 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
+               "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
+               "code.namespace": "MockAggregate",
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 5,
@@ -123,7 +125,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.load",
+                        name: "load MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -133,7 +135,9 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "load",
+               "messaging.destination.name": "MockAggregate",
                "code.function": "load",
+               "code.namespace": "MockAggregate",
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
@@ -164,7 +168,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.load",
+                        name: "load MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -198,7 +202,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.populate",
+                        name: "populate MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -208,7 +212,9 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
+               "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
+               "code.namespace": "MockAggregate",
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
@@ -232,7 +238,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.populate",
+                        name: "populate MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -242,7 +248,9 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
+               "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
+               "code.namespace": "MockAggregate",
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 10,

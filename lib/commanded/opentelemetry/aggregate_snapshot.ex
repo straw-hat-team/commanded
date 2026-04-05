@@ -30,12 +30,16 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
         meta,
         _config
       ) do
+    aggregate_module_name = Helpers.module_name(meta.aggregate_module)
+
     attributes =
       [
         {MessagingAttributes.messaging_system(), "commanded"},
         {MessagingAttributes.messaging_operation_type(), :publish},
         {MessagingAttributes.messaging_operation_name(), "snapshot"},
+        {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
         {CodeAttributes.code_function(), "snapshot"},
+        {CodeAttributes.code_namespace(), aggregate_module_name},
         {CommandedAttributes.commanded_application(), meta.application},
         {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
         {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
@@ -45,7 +49,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
-      "commanded.aggregate.snapshot",
+      "snapshot #{aggregate_module_name}",
       meta,
       %{
         kind: :internal,

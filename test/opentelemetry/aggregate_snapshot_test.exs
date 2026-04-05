@@ -72,7 +72,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.snapshot",
+                        name: "snapshot MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -82,7 +82,9 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
                "messaging.system": "commanded",
                "messaging.operation.type": :publish,
                "messaging.operation.name": "snapshot",
+               "messaging.destination.name": "MockAggregate",
                "code.function": "snapshot",
+               "code.namespace": "MockAggregate",
                "commanded.application": MockApp,
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 10,
@@ -108,7 +110,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.snapshot",
+                        name: "snapshot MockAggregate",
                         kind: :internal,
                         attributes: attributes
                       )},
@@ -143,7 +145,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
 
       assert_receive {:span,
                       span(
-                        name: "commanded.aggregate.snapshot",
+                        name: "snapshot MockAggregate",
                         status: {:status, :error, _error_message},
                         attributes: span_attrs
                       )},

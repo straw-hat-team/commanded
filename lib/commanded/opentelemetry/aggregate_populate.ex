@@ -2,6 +2,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
   @moduledoc false
 
   alias Commanded.OpenTelemetry.CommandedAttributes
+  alias Commanded.OpenTelemetry.Helpers
   alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
@@ -29,11 +30,15 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
         meta,
         _config
       ) do
+    aggregate_module_name = Helpers.module_name(meta.aggregate_module)
+
     attributes = [
       {MessagingAttributes.messaging_system(), "commanded"},
       {MessagingAttributes.messaging_operation_type(), :receive},
       {MessagingAttributes.messaging_operation_name(), "load"},
+      {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
       {CodeAttributes.code_function(), "load"},
+      {CodeAttributes.code_namespace(), aggregate_module_name},
       {CommandedAttributes.commanded_application(), meta.application},
       {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
       {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
@@ -41,7 +46,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
-      "commanded.aggregate.load",
+      "load #{aggregate_module_name}",
       meta,
       %{
         kind: :internal,
@@ -90,13 +95,17 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
         meta,
         _config
       ) do
+    aggregate_module_name = Helpers.module_name(meta.aggregate_module)
+
     attributes = [
       # OTel Messaging SemConv
       {MessagingAttributes.messaging_system(), "commanded"},
       {MessagingAttributes.messaging_operation_type(), :receive},
       {MessagingAttributes.messaging_operation_name(), "populate"},
+      {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
       # OTel Code SemConv
       {CodeAttributes.code_function(), "populate"},
+      {CodeAttributes.code_namespace(), aggregate_module_name},
       # Commanded-specific
       {CommandedAttributes.commanded_application(), meta.application},
       {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
@@ -105,7 +114,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
-      "commanded.aggregate.populate",
+      "populate #{aggregate_module_name}",
       meta,
       %{
         kind: :internal,
