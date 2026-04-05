@@ -117,8 +117,10 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     )
   end
 
-  def handle_telemetry_event([:commanded, :event, :handle, :stop], _measurements, meta, _config) do
+  def handle_telemetry_event([:commanded, :event, :handle, :stop], measurements, meta, _config) do
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+
+    put_handler_lag(ctx, measurements)
 
     if error = meta[:error] do
       Span.set_attribute(
@@ -209,8 +211,10 @@ defmodule Commanded.OpenTelemetry.EventHandler do
     )
   end
 
-  def batch_telemetry_event([:commanded, :event, :batch, :stop], _measurements, meta, _config) do
+  def batch_telemetry_event([:commanded, :event, :batch, :stop], measurements, meta, _config) do
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
+
+    put_handler_lag(ctx, measurements)
 
     if error = meta[:error] do
       Span.set_attribute(
@@ -253,6 +257,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
+
+  defp put_handler_lag(ctx, %{processing_latency_ms: latency})
+       when is_integer(latency) do
+    Span.set_attribute(ctx, CommandedAttributes.commanded_handler_lag(), latency)
+  end
+
+  defp put_handler_lag(_ctx, _measurements), do: :ok
 
   defp put_links(span_opts, []), do: span_opts
   defp put_links(span_opts, links), do: Map.put(span_opts, :links, links)

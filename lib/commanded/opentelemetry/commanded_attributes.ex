@@ -171,4 +171,11 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   """
   @spec commanded_wrong_expected_version_count() :: :"commanded.wrong_expected_version.count"
   def commanded_wrong_expected_version_count, do: :"commanded.wrong_expected_version.count"
+
+  @doc """
+  Elapsed milliseconds from event creation to handler completion (end-to-end processing latency).
+  For batch handlers, reflects the oldest event in the batch (worst-case latency).
+  """
+  @spec commanded_handler_lag() :: :"commanded.handler.lag"
+  def commanded_handler_lag, do: :"commanded.handler.lag"
 end
