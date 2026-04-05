@@ -14,6 +14,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     measurements: "%{system_time: integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_state: struct(),
       aggregate_version: non_neg_integer()}
@@ -26,6 +27,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     measurements: "%{duration: non_neg_integer(), count: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_state: struct(),
       aggregate_version: non_neg_integer(),
@@ -40,6 +42,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     measurements: "%{system_time: integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_state: struct(),
       aggregate_version: non_neg_integer()}
@@ -52,6 +55,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     measurements: "%{duration: non_neg_integer(), count: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_state: struct(),
       aggregate_version: non_neg_integer()}
@@ -189,6 +193,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   defp telemetry_metadata(%Aggregate{} = state) do
     %Aggregate{
       application: application,
+      aggregate_module: aggregate_module,
       aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
       aggregate_version: aggregate_version
@@ -196,6 +201,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
 
     %{
       application: application,
+      aggregate_module: aggregate_module,
       aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
       aggregate_version: aggregate_version

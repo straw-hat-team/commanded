@@ -601,6 +601,7 @@ defmodule Commanded.TestSupport.Factory do
 
     defaults = [
       application: Keyword.get(opts, :application, MockApp),
+      aggregate_module: Keyword.get(opts, :aggregate_module, MockAggregate),
       aggregate_uuid: aggregate_uuid,
       aggregate_state: Keyword.get(opts, :aggregate_state, %{}),
       aggregate_version: Keyword.get(opts, :aggregate_version, 0)
@@ -610,6 +611,7 @@ defmodule Commanded.TestSupport.Factory do
 
     %{
       application: Keyword.fetch!(opts, :application),
+      aggregate_module: Keyword.fetch!(opts, :aggregate_module),
       aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
       aggregate_state: Keyword.fetch!(opts, :aggregate_state),
       aggregate_version: Keyword.fetch!(opts, :aggregate_version)
@@ -630,6 +632,7 @@ defmodule Commanded.TestSupport.Factory do
 
     defaults = [
       application: Keyword.get(opts, :application, MockApp),
+      aggregate_module: Keyword.get(opts, :aggregate_module, MockAggregate),
       aggregate_uuid: aggregate_uuid,
       aggregate_version: Keyword.get(opts, :aggregate_version, 0),
       snapshot_every: Keyword.get(opts, :snapshot_every),
@@ -640,6 +643,7 @@ defmodule Commanded.TestSupport.Factory do
 
     %{
       application: Keyword.fetch!(opts, :application),
+      aggregate_module: Keyword.fetch!(opts, :aggregate_module),
       aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
       aggregate_version: Keyword.fetch!(opts, :aggregate_version),
       snapshot_every: Keyword.get(opts, :snapshot_every),

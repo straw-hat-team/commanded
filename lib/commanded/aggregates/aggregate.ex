@@ -71,6 +71,7 @@ defmodule Commanded.Aggregates.Aggregate do
     measurements: "%{system_time: integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_version: non_neg_integer(),
       snapshot_every: non_neg_integer() | nil,
@@ -84,6 +85,7 @@ defmodule Commanded.Aggregates.Aggregate do
     measurements: "%{duration: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_version: non_neg_integer(),
       snapshot_every: non_neg_integer() | nil,
@@ -98,6 +100,7 @@ defmodule Commanded.Aggregates.Aggregate do
     measurements: "%{duration: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
+      aggregate_module: module(),
       aggregate_uuid: String.t(),
       aggregate_version: non_neg_integer(),
       snapshot_every: non_neg_integer() | nil,
@@ -680,6 +683,7 @@ defmodule Commanded.Aggregates.Aggregate do
   defp do_take_snapshot(%Aggregate{} = state) do
     %Aggregate{
       application: application,
+      aggregate_module: aggregate_module,
       aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
       aggregate_version: aggregate_version,
@@ -691,6 +695,7 @@ defmodule Commanded.Aggregates.Aggregate do
 
     meta = %{
       application: application,
+      aggregate_module: aggregate_module,
       aggregate_uuid: aggregate_uuid,
       aggregate_version: aggregate_version,
       snapshot_every: snapshot_every,
