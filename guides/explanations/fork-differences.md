@@ -272,3 +272,15 @@ end
 - Track `wrong_expected_version_count` in aggregate struct and `:stop` telemetry metadata
 - OTel execute span records `commanded.aggregate.wrong_expected_version` event when count > 0
 - Enables alerting on optimistic concurrency conflicts via telemetry
+
+### **Event Handler Processing Latency Telemetry**
+[PR #66](https://github.com/straw-hat-team/commanded/pull/66)
+
+**Changes:**
+- Added `processing_latency_ms` measurement to `[:commanded, :event, :handle, :stop]` and `[:commanded, :event, :batch, :stop]` telemetry events
+- `processing_latency_ms` is the elapsed milliseconds between `RecordedEvent.created_at` and handler completion — how long it took the system to fully process the event from creation to done
+- For batch handlers, reflects the oldest event in the batch (worst-case processing latency)
+
+**Benefits:**
+- All event handlers (projectors, sagas, notification handlers) get processing latency visibility for free
+- Enables SLA dashboards and alerting without any application-level code

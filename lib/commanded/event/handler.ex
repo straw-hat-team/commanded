@@ -20,7 +20,7 @@ defmodule Commanded.Event.Handler do
   telemetry_event(%{
     event: [:commanded, :event, :handle, :stop],
     description: "Emitted when an event handler stops handling an event",
-    measurements: "%{duration: non_neg_integer()}",
+    measurements: "%{duration: non_neg_integer(), processing_latency_ms: non_neg_integer()}",
     metadata: """
     %{:application => Commanded.Application.t(),
       :context => map(),
@@ -68,7 +68,7 @@ defmodule Commanded.Event.Handler do
   telemetry_event(%{
     event: [:commanded, :event, :batch, :stop],
     description: "Emitted when an event handler stops handling a batch of events",
-    measurements: "%{duration: non_neg_integer()}",
+    measurements: "%{duration: non_neg_integer(), processing_latency_ms: non_neg_integer()}",
     metadata: """
     %{application: Commanded.Application.t(),
       context: map(),
@@ -1046,7 +1046,12 @@ defmodule Commanded.Event.Handler do
 
     case delegate_event_to_handler(event, state) do
       :ok ->
-        telemetry_stop(start_time, telemetry_metadata, :handle)
+        telemetry_stop(
+          start_time,
+          telemetry_metadata,
+          :handle,
+          processing_latency_measurements(event)
+        )
 
         confirm_receipt(event, state)
 
@@ -1054,7 +1059,8 @@ defmodule Commanded.Event.Handler do
         telemetry_stop(
           start_time,
           Map.put(telemetry_metadata, :handler_state, handler_state),
-          :handle
+          :handle,
+          processing_latency_measurements(event)
         )
 
         confirm_receipt(event, %Handler{state | handler_state: handler_state})
@@ -1063,14 +1069,21 @@ defmodule Commanded.Event.Handler do
         telemetry_stop(
           start_time,
           Map.put(telemetry_metadata, :error, :already_seen_event),
-          :handle
+          :handle,
+          processing_latency_measurements(event)
         )
 
         confirm_receipt(event, state)
 
       {:error, reason} = error ->
         log_event_error(error, event, state)
-        telemetry_stop(start_time, Map.put(telemetry_metadata, :error, reason), :handle)
+
+        telemetry_stop(
+          start_time,
+          Map.put(telemetry_metadata, :error, reason),
+          :handle,
+          processing_latency_measurements(event)
+        )
 
         failure_context = build_failure_context(event, context, state)
         retry_fun = fn context, state -> handle_event(event, context, state) end
@@ -1078,7 +1091,16 @@ defmodule Commanded.Event.Handler do
 
       {:error, reason, stacktrace} ->
         log_event_error({:error, reason, stacktrace}, event, state)
-        telemetry_exception(start_time, :error, reason, stacktrace, telemetry_metadata, :handle)
+
+        telemetry_exception(
+          start_time,
+          :error,
+          reason,
+          stacktrace,
+          telemetry_metadata,
+          :handle,
+          processing_latency_measurements(event)
+        )
 
         failure_context = build_failure_context(event, context, stacktrace, state)
         retry_fun = fn context, state -> handle_event(event, context, state) end
@@ -1097,7 +1119,8 @@ defmodule Commanded.Event.Handler do
         telemetry_stop(
           start_time,
           Map.put(telemetry_metadata, :error, :invalid_return_value),
-          :handle
+          :handle,
+          processing_latency_measurements(event)
         )
 
         error = {:error, :invalid_return_value}
@@ -1137,16 +1160,34 @@ defmodule Commanded.Event.Handler do
 
     case delegate_event_to_handler(events, state) do
       :ok ->
-        telemetry_stop(start_time, telemetry_metadata, :batch)
+        telemetry_stop(
+          start_time,
+          telemetry_metadata,
+          :batch,
+          processing_latency_measurements(events)
+        )
+
         confirm_receipt(events, state)
 
       {:ok, handler_state} ->
-        telemetry_stop(start_time, %{telemetry_metadata | handler_state: state}, :batch)
+        telemetry_stop(
+          start_time,
+          %{telemetry_metadata | handler_state: handler_state},
+          :batch,
+          processing_latency_measurements(events)
+        )
+
         confirm_receipt(events, %Handler{state | handler_state: handler_state})
 
       {:error, reason} = error ->
         log_batch_error(error, events, state)
-        telemetry_stop(start_time, Map.put(telemetry_metadata, :error, reason), :batch)
+
+        telemetry_stop(
+          start_time,
+          Map.put(telemetry_metadata, :error, reason),
+          :batch,
+          processing_latency_measurements(events)
+        )
 
         failure_context = build_failure_context(nil, context, state)
         retry_fun = fn context, state -> handle_batch(events, context, state) end
@@ -1154,7 +1195,16 @@ defmodule Commanded.Event.Handler do
 
       {:error, reason, stacktrace} ->
         log_batch_error({:error, reason, stacktrace}, events, state)
-        telemetry_exception(start_time, :error, reason, stacktrace, telemetry_metadata, :batch)
+
+        telemetry_exception(
+          start_time,
+          :error,
+          reason,
+          stacktrace,
+          telemetry_metadata,
+          :batch,
+          processing_latency_measurements(events)
+        )
 
         failure_context = build_failure_context(nil, context, stacktrace, state)
         retry_fun = fn context, state -> handle_batch(events, context, state) end
@@ -1170,7 +1220,8 @@ defmodule Commanded.Event.Handler do
         telemetry_stop(
           start_time,
           Map.put(telemetry_metadata, :error, :invalid_return_value),
-          :batch
+          :batch,
+          processing_latency_measurements(events)
         )
 
         failure_context = build_failure_context(nil, context, state)
@@ -1428,8 +1479,13 @@ defmodule Commanded.Event.Handler do
     Telemetry.start([:commanded, :event, telemetry_type], telemetry_metadata)
   end
 
-  defp telemetry_stop(start_time, telemetry_metadata, telemetry_type) do
-    Telemetry.stop([:commanded, :event, telemetry_type], start_time, telemetry_metadata)
+  defp telemetry_stop(start_time, telemetry_metadata, telemetry_type, additional_measurements) do
+    Telemetry.stop(
+      [:commanded, :event, telemetry_type],
+      start_time,
+      telemetry_metadata,
+      additional_measurements
+    )
   end
 
   defp telemetry_exception(
@@ -1438,7 +1494,8 @@ defmodule Commanded.Event.Handler do
          reason,
          stacktrace,
          telemetry_metadata,
-         telemetry_type
+         telemetry_type,
+         additional_measurements
        ) do
     Telemetry.exception(
       [:commanded, :event, telemetry_type],
@@ -1446,9 +1503,19 @@ defmodule Commanded.Event.Handler do
       kind,
       reason,
       stacktrace,
-      telemetry_metadata
+      telemetry_metadata,
+      additional_measurements
     )
   end
+
+  defp processing_latency_measurements(%RecordedEvent{created_at: %DateTime{} = created_at}) do
+    %{processing_latency_ms: DateTime.diff(DateTime.utc_now(), created_at, :millisecond)}
+  end
+
+  defp processing_latency_measurements([%RecordedEvent{} = first | _]),
+    do: processing_latency_measurements(first)
+
+  defp processing_latency_measurements(_), do: %{}
 
   defp batch_telemetry_metadata(recorded_events, context, %Handler{} = state)
        when is_list(recorded_events) do
