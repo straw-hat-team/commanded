@@ -591,6 +591,64 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
 
       refute parent_id == :undefined
     end
+
+    test "clears stale context when no traceparent in event metadata" do
+      stale_traceparent =
+        Tracer.with_span "stale.context.span" do
+          encode_traceparent(Tracer.current_span_ctx())
+        end
+
+      stale_headers = [{"traceparent", stale_traceparent}]
+      stale_ctx = :otel_propagator_text_map.extract_to(:otel_ctx.new(), stale_headers)
+      :otel_ctx.attach(stale_ctx)
+
+      recorded_event = build_recorded_event("child-stale-no-trace", %{})
+      meta = build_meta(recorded_event)
+
+      :telemetry.span([:commanded, :event, :handle], meta, fn ->
+        {:ok, meta}
+      end)
+
+      assert_receive {:span,
+                      span(
+                        name: "handle MyApp.Projectors.AccountProjector",
+                        parent_span_id: parent_id
+                      )},
+                     1000
+
+      assert parent_id == :undefined,
+             "Expected no parent when event has no traceparent, but :child mode inherited stale context."
+    end
+
+    test "batch spans clear stale context - always start fresh regardless of span_relationship" do
+      stale_traceparent =
+        Tracer.with_span "stale.batch.child.span" do
+          encode_traceparent(Tracer.current_span_ctx())
+        end
+
+      stale_headers = [{"traceparent", stale_traceparent}]
+      stale_ctx = :otel_propagator_text_map.extract_to(:otel_ctx.new(), stale_headers)
+      :otel_ctx.attach(stale_ctx)
+
+      meta = build_batch_meta()
+
+      :telemetry.span([:commanded, :event, :batch], meta, fn ->
+        {:ok, meta}
+      end)
+
+      assert_receive {:span,
+                      span(
+                        name: "batch MyApp.Projectors.TransactionProjector",
+                        parent_span_id: parent_id,
+                        links: links
+                      )},
+                     1000
+
+      assert parent_id == :undefined,
+             "Batch spans should always start fresh traces regardless of span_relationship setting."
+
+      assert :otel_links.list(links) == []
+    end
   end
 
   describe "span_relationship: :link" do
