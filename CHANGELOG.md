@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.0](https://github.com/straw-hat-team/commanded/compare/v3.4.1...v3.5.0) (2026-04-05)
+
+
+### Features
+
+* **telemetry:** Add aggregate_module to load/populate/snapshot telemetry metadata ([#69](https://github.com/straw-hat-team/commanded/issues/69)) ([78bcfe7](https://github.com/straw-hat-team/commanded/commit/78bcfe73940c49a1e8650292afabaac5f8d26962))
+* **telemetry:** Add and surface processing_latency_ms in event handler spans ([#68](https://github.com/straw-hat-team/commanded/issues/68)) ([ffaafcf](https://github.com/straw-hat-team/commanded/commit/ffaafcf472c8f98d398bf202550c070adf77b1d2))
+* **telemetry:** Add processing_latency_ms to event handler stop measurements ([#66](https://github.com/straw-hat-team/commanded/issues/66)) ([edbe23e](https://github.com/straw-hat-team/commanded/commit/edbe23e2528ac23f8c7e7c7bd3bea32ab7cd6f4a))
+
 ## [3.4.1](https://github.com/straw-hat-team/commanded/compare/v3.4.0...v3.4.1) (2026-04-01)
 
 
