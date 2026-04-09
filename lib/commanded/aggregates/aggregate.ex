@@ -177,6 +177,9 @@ defmodule Commanded.Aggregates.Aggregate do
   @type return_event :: struct() | list(struct()) | {:ok, struct()} | {:ok, list(struct())}
   @type no_return_event :: :ok | {:ok, []} | nil | []
 
+  @type aggregate_state_opt :: {:timeout, timeout()} | {:initial_state, module()}
+  @type aggregate_state_opts :: [aggregate_state_opt()]
+
   @doc """
   Optionally execute a command against the aggregate. Returns either no event, one event,
   a list of events, or an error tuple.
@@ -194,6 +197,7 @@ defmodule Commanded.Aggregates.Aggregate do
   defstruct [
     :application,
     :aggregate_module,
+    :initial_state,
     :aggregate_uuid,
     :aggregate_state,
     :snapshotting,
@@ -208,6 +212,8 @@ defmodule Commanded.Aggregates.Aggregate do
 
     aggregate_module = Keyword.fetch!(aggregate_opts, :aggregate_module)
     aggregate_uuid = Keyword.fetch!(aggregate_opts, :aggregate_uuid)
+    initial_state = Keyword.get(aggregate_opts, :initial_state)
+    validate_initial_state_module!(initial_state)
 
     unless is_atom(aggregate_module),
       do: raise(ArgumentError, message: "aggregate module must be an atom")
@@ -222,6 +228,7 @@ defmodule Commanded.Aggregates.Aggregate do
     state = %Aggregate{
       application: application,
       aggregate_module: aggregate_module,
+      initial_state: initial_state,
       aggregate_uuid: aggregate_uuid,
       snapshotting: Snapshotting.new(application, aggregate_uuid, snapshot_options)
     }
@@ -278,7 +285,17 @@ defmodule Commanded.Aggregates.Aggregate do
   end
 
   @doc false
-  def aggregate_state(application, aggregate_module, aggregate_uuid, timeout \\ 5_000) do
+  def aggregate_state(application, aggregate_module, aggregate_uuid, timeout_or_opts \\ 5_000)
+
+  def aggregate_state(application, aggregate_module, aggregate_uuid, timeout)
+      when is_integer(timeout) or timeout == :infinity do
+    aggregate_state(application, aggregate_module, aggregate_uuid, timeout: timeout)
+  end
+
+  def aggregate_state(application, aggregate_module, aggregate_uuid, opts) when is_list(opts) do
+    timeout = Keyword.get(opts, :timeout, 5_000)
+    initial_state = Keyword.get(opts, :initial_state)
+    validate_initial_state_module!(initial_state)
     name = via_name(application, aggregate_module, aggregate_uuid)
 
     try do
@@ -297,6 +314,7 @@ defmodule Commanded.Aggregates.Aggregate do
             %Aggregate{
               application: application,
               aggregate_module: aggregate_module,
+              initial_state: initial_state,
               aggregate_uuid: aggregate_uuid,
               snapshotting: Snapshotting.new(application, aggregate_uuid, snapshot_options)
             }
@@ -308,6 +326,9 @@ defmodule Commanded.Aggregates.Aggregate do
           {:ok, result} ->
             result
 
+          {:exit, reason} ->
+            exit(reason)
+
           nil ->
             exit({:timeout, {GenServer, :call, [name, :aggregate_state, timeout]}})
         end
@@ -318,6 +339,12 @@ defmodule Commanded.Aggregates.Aggregate do
   def aggregate_version(application, aggregate_module, aggregate_uuid, timeout \\ 5_000) do
     name = via_name(application, aggregate_module, aggregate_uuid)
     GenServer.call(name, :aggregate_version, timeout)
+  end
+
+  @doc false
+  def initial_state_module(application, aggregate_module, aggregate_uuid, timeout \\ 5_000) do
+    name = via_name(application, aggregate_module, aggregate_uuid)
+    GenServer.call(name, :initial_state_module, timeout)
   end
 
   @doc false
@@ -435,6 +462,14 @@ defmodule Commanded.Aggregates.Aggregate do
     %Aggregate{aggregate_version: aggregate_version} = state
 
     reply_with_lifespan(aggregate_version, state)
+  end
+
+  @doc false
+  @impl GenServer
+  def handle_call(:initial_state_module, _from, %Aggregate{} = state) do
+    %Aggregate{initial_state: initial_state} = state
+
+    reply_with_lifespan(initial_state, state)
   end
 
   @doc false
@@ -812,5 +847,28 @@ defmodule Commanded.Aggregates.Aggregate do
       {:stop, reason} -> {:stop, reason, state}
       lifespan_timeout -> {:noreply, state, lifespan_timeout}
     end
+  end
+
+  defp validate_initial_state_module!(nil), do: :ok
+
+  defp validate_initial_state_module!(initial_state) when is_atom(initial_state) do
+    case Code.ensure_compiled(initial_state) do
+      {:module, _} ->
+        if function_exported?(initial_state, :initial_state, 0) do
+          :ok
+        else
+          raise ArgumentError,
+                "initial_state module #{inspect(initial_state)} must export initial_state/0 function."
+        end
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "initial_state module #{inspect(initial_state)} could not be loaded: #{inspect(reason)}"
+    end
+  end
+
+  defp validate_initial_state_module!(initial_state) do
+    raise ArgumentError,
+          "initial_state must be a module but got: #{inspect(initial_state)}"
   end
 end

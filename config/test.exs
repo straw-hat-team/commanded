@@ -38,7 +38,7 @@ config :commanded, TestEventStore,
   username: "postgres",
   password: "postgres",
   database: "eventstore_test",
-  hostname: "localhost",
+  hostname: System.get_env("PG_HOST", "localhost"),
   pool_size: 5,
   pool_overflow: 0
 
@@ -49,5 +49,5 @@ config :commanded, Commanded.Projections.Repo,
   database: "commanded_projections_test",
   username: "postgres",
   password: "postgres",
-  hostname: "localhost",
+  hostname: System.get_env("PG_HOST", "localhost"),
   pool: Ecto.Adapters.SQL.Sandbox

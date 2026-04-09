@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Refactor.LongQuoteBlocks
 defmodule Commanded.Commands.Router do
   @moduledoc """
   Command routing macro to allow configuration of each command to its command handler.
@@ -72,6 +73,42 @@ defmodule Commanded.Commands.Router do
         # Will route to `BankAccount.open_account/2`
         dispatch OpenAccount, to: BankAccount, function: :open_account, identity: :account_number
       end
+
+  ## Custom initial state
+
+  By default, the aggregate module is expected to define a struct that represents
+  the aggregate's state, and `struct(AggregateModule)` is used to create the initial
+  state. You can customize the initial state using the `initial_state` option,
+  which specifies a module that implements an `initial_state/0` function.
+
+  This is useful when:
+  - You want to use protobuf-generated messages as aggregate state
+  - You want to separate aggregate behavior from state representation
+
+  ### Example
+
+      defmodule BankAccountState do
+        defstruct [:account_number, :balance, status: :uninitialized]
+
+        def initial_state, do: %__MODULE__{}
+      end
+
+      defmodule BankRouter do
+        use Commanded.Commands.Router
+
+        dispatch OpenAccount,
+          to: BankAccount,
+          initial_state: BankAccountState,
+          identity: :account_number
+      end
+
+  When using a custom initial state:
+
+    - `initial_state.initial_state()` is called to create the initial state
+    - The aggregate module's `execute/2` and `apply/2` functions receive and
+      return the state struct type
+    - If `initial_state` is not specified, `struct(AggregateModule)` is used
+      (the default behavior)
 
   ## Define aggregate identity
 
@@ -504,14 +541,66 @@ defmodule Commanded.Commands.Router do
                     [middleware | acc]
                   end)
 
+      @registered_commands
+      |> Enum.group_by(
+        fn {_command_module, opts} -> Keyword.fetch!(opts, :aggregate) end,
+        fn {command_module, opts} -> {command_module, Keyword.get(opts, :initial_state)} end
+      )
+      |> Enum.each(fn {aggregate, commands_with_state} ->
+        commands_with_state
+        |> Enum.map(&elem(&1, 1))
+        |> Enum.uniq()
+        |> case do
+          [_] ->
+            :ok
+
+          _ ->
+            [{conflicting_command, conflicting_state} | _] = commands_with_state
+            [{_, existing_state} | _] = Enum.reverse(commands_with_state)
+
+            raise ArgumentError, """
+            aggregate #{inspect(aggregate)} must use the same `:initial_state` option across all dispatched commands.
+
+            Existing `:initial_state`: #{inspect(existing_state)}
+            Conflicting command: #{inspect(conflicting_command)}
+            Conflicting `:initial_state`: #{inspect(conflicting_state)}
+            """
+        end
+      end)
+
       for {command_module, command_opts} <- @registered_commands do
         @aggregate Keyword.fetch!(command_opts, :aggregate)
+        @initial_state Keyword.get(command_opts, :initial_state)
         @handler Keyword.fetch!(command_opts, :to)
         @function Keyword.fetch!(command_opts, :function)
         @before_execute Keyword.get(command_opts, :before_execute)
         @lifespan Keyword.get(command_opts, :lifespan)
         @identity Keyword.get(command_opts, :identity)
         @identity_prefix Keyword.get(command_opts, :identity_prefix)
+
+        if @initial_state do
+          case Code.ensure_compiled(@initial_state) do
+            {:module, _} ->
+              # credo:disable-for-next-line Credo.Check.Refactor.Nesting
+              unless function_exported?(@initial_state, :initial_state, 0) do
+                raise ArgumentError, """
+                initial_state module #{inspect(@initial_state)} must export initial_state/0 function.
+
+                Example:
+
+                    defmodule #{inspect(@initial_state)} do
+                      defstruct [:field]
+
+                      def initial_state, do: %__MODULE__{}
+                    end
+                """
+              end
+
+            {:error, reason} ->
+              raise ArgumentError,
+                    "initial_state module #{inspect(@initial_state)} could not be loaded: #{inspect(reason)}"
+          end
+        end
 
         @command_module command_module
         @command_opts command_opts
@@ -576,6 +665,7 @@ defmodule Commanded.Commands.Router do
             handler_function: @function,
             handler_before_execute: @before_execute,
             aggregate_module: @aggregate,
+            initial_state: @initial_state,
             identity: identity,
             identity_prefix: identity_prefix,
             returning: returning,
@@ -659,6 +749,7 @@ defmodule Commanded.Commands.Router do
     :function,
     :before_execute,
     :aggregate,
+    :initial_state,
     :identity,
     :identity_prefix,
     :timeout,

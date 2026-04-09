@@ -227,7 +227,7 @@ defmodule Commanded.Commands.RoutingCommandsTest do
     assert_raise ArgumentError,
                  """
                  unexpected dispatch parameter "id"
-                 available params are: to, function, before_execute, aggregate, identity, identity_prefix, timeout, lifespan, consistency
+                 available params are: to, function, before_execute, aggregate, initial_state, identity, identity_prefix, timeout, lifespan, consistency
                  """,
                  fn ->
                    Code.eval_string("""
@@ -256,6 +256,39 @@ defmodule Commanded.Commands.RoutingCommandsTest do
         end
       """)
     end
+  end
+
+  test "should reject mixed initial_state configuration for the same aggregate" do
+    assert_raise ArgumentError,
+                 ~r/must use the same `:initial_state` option across all dispatched commands/,
+                 fn ->
+                   Code.eval_string("""
+                     alias Commanded.ExampleDomain.BankAccount
+                     alias Commanded.ExampleDomain.BankAccount.Commands.{OpenAccount, DepositMoney}
+                     alias Commanded.ExampleDomain.{OpenAccountHandler, DepositMoneyHandler}
+
+                     defmodule CustomInitialState do
+                       defstruct [:dummy]
+
+                       def initial_state, do: %__MODULE__{}
+                     end
+
+                     defmodule InvalidInitialStateRouter do
+                       use Commanded.Commands.Router
+
+                       dispatch OpenAccount,
+                         to: OpenAccountHandler,
+                         aggregate: BankAccount,
+                         initial_state: CustomInitialState,
+                         identity: :account_number
+
+                       dispatch DepositMoney,
+                         to: DepositMoneyHandler,
+                         aggregate: BankAccount,
+                         identity: :account_number
+                     end
+                   """)
+                 end
   end
 
   defmodule MultiCommandRouter do

@@ -214,18 +214,25 @@ defmodule Commanded.Application do
       Retrieving aggregate state is done by calling to the opened aggregate,
       or querying the event store for an optional state snapshot
       and then replaying the aggregate's event stream.
+
+      ## Options
+
+        - `:timeout` - timeout in milliseconds (default: 5000)
+        - `:initial_state` - module that implements `initial_state/0` callback.
+          Used when rebuilding state from events. Defaults to `aggregate_module`.
+
       """
       @spec aggregate_state(
               aggregate_module :: module(),
               aggregate_uuid :: Aggregate.uuid(),
-              timeout :: integer
+              timeout_or_opts :: timeout() | Aggregate.aggregate_state_opts()
             ) :: Aggregate.state()
-      def aggregate_state(aggregate_module, aggregate_uuid, timeout \\ 5000) do
+      def aggregate_state(aggregate_module, aggregate_uuid, timeout_or_opts \\ 5000) do
         Aggregate.aggregate_state(
           __MODULE__,
           aggregate_module,
           aggregate_uuid,
-          timeout
+          timeout_or_opts
         )
       end
 
