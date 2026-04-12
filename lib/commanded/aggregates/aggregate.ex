@@ -13,7 +13,8 @@ defmodule Commanded.Aggregates.Aggregate do
       aggregate_state: struct(),
       aggregate_version: non_neg_integer(),
       caller: pid(),
-      execution_context: Commanded.Aggregates.ExecutionContext.t()}
+      execution_context: Commanded.Aggregates.ExecutionContext.t(),
+      registry_adapter: module()}
     """
   })
 
@@ -28,6 +29,7 @@ defmodule Commanded.Aggregates.Aggregate do
       aggregate_version: non_neg_integer(),
       caller: pid(),
       execution_context: Commanded.Aggregates.ExecutionContext.t(),
+      registry_adapter: module(),
       events: [map()],
       error: nil | any(),
       wrong_expected_version_count: non_neg_integer()}
@@ -769,6 +771,8 @@ defmodule Commanded.Aggregates.Aggregate do
 
     {pid, _ref} = from
 
+    {registry_adapter, _} = Commanded.Application.registry_adapter(application)
+
     %{
       application: application,
       aggregate_uuid: aggregate_uuid,
@@ -776,6 +780,7 @@ defmodule Commanded.Aggregates.Aggregate do
       aggregate_version: aggregate_version,
       caller: pid,
       execution_context: context,
+      registry_adapter: registry_adapter,
       wrong_expected_version_count: wrong_expected_version_count
     }
   end

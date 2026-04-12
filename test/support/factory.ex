@@ -573,7 +573,8 @@ defmodule Commanded.TestSupport.Factory do
       aggregate_state: Keyword.fetch!(opts, :aggregate_state),
       aggregate_version: Keyword.fetch!(opts, :aggregate_version),
       caller: Keyword.fetch!(opts, :caller),
-      execution_context: Keyword.fetch!(opts, :execution_context)
+      execution_context: Keyword.fetch!(opts, :execution_context),
+      registry_adapter: Keyword.get(opts, :registry_adapter, Commanded.Registration.LocalRegistry)
     }
   end
 

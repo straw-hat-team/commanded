@@ -113,6 +113,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": correlation_id,
                "commanded.causation_id": causation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 0
              }
     end
@@ -161,6 +162,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.Middleware.Commands.IncrementCount",
                "commanded.causation_id": causation_id,
                "commanded.correlation_id": correlation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 1
              }
     end
@@ -223,6 +225,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.Middleware.Commands.IncrementCount",
                "commanded.causation_id": causation_id1,
                "commanded.correlation_id": correlation_id1,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 1
              }
 
@@ -256,6 +259,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.Middleware.Commands.IncrementCount",
                "commanded.causation_id": causation_id2,
                "commanded.correlation_id": correlation_id2,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 1
              }
     end
@@ -314,6 +318,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": correlation_id,
                "commanded.causation_id": causation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 0,
                "error.type": "validation_failed"
              }
@@ -359,6 +364,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": context.correlation_id,
                "commanded.causation_id": context.causation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "erlang.exception.kind": :error,
                "error.type": "Elixir.ArgumentError"
              }
@@ -404,6 +410,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": context.correlation_id,
                "commanded.causation_id": context.causation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "erlang.exception.kind": :error,
                "error.type": "Elixir.RuntimeError"
              }
@@ -596,6 +603,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": correlation_id,
                "commanded.causation_id": causation_id,
+               "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 0
              }
     end
