@@ -58,7 +58,9 @@ defmodule Commanded.OpenTelemetry.Aggregate do
       {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version},
       {CommandedAttributes.commanded_command(), Helpers.struct_name(context.command)},
       {CommandedAttributes.commanded_correlation_id(), context.correlation_id},
-      {CommandedAttributes.commanded_causation_id(), context.causation_id}
+      {CommandedAttributes.commanded_causation_id(), context.causation_id},
+      {CommandedAttributes.commanded_registry_adapter(),
+       Helpers.module_name(meta.registry_adapter)}
     ]
 
     # OTel semconv: span name = "{operation.name} {destination.name}"

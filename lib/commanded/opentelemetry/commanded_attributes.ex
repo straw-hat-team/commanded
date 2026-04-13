@@ -178,4 +178,10 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   """
   @spec commanded_handler_lag() :: :"commanded.handler.lag"
   def commanded_handler_lag, do: :"commanded.handler.lag"
+
+  @doc """
+  The process registry adapter module (e.g. Commanded.Registration.GlobalRegistry).
+  """
+  @spec commanded_registry_adapter() :: :"commanded.registry.adapter"
+  def commanded_registry_adapter, do: :"commanded.registry.adapter"
 end
