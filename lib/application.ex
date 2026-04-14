@@ -366,7 +366,7 @@ defmodule Commanded.Application do
   """
   @callback dispatch(
               command :: struct(),
-              timeout_or_opts :: non_neg_integer() | :infinity | Keyword.t()
+              timeout_or_opts :: non_neg_integer() | :infinity | Router.dispatch_options()
             ) :: Router.dispatch_resp()
 
   @doc false
