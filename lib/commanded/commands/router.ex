@@ -383,6 +383,7 @@ defmodule Commanded.Commands.Router do
           :ok
           | {:ok, aggregate_state :: struct()}
           | {:ok, aggregate_version :: non_neg_integer()}
+          | {:ok, events :: [struct()]}
           | {:ok, execution_result :: ExecutionResult.t()}
           | {:error, :unregistered_command}
           | {:error, :consistency_timeout}
