@@ -37,8 +37,7 @@ defmodule Commanded.Commands.Dispatcher do
 
   # Dispatch the given command to the handler module for the aggregate as
   # identified.
-  @spec dispatch(payload :: Payload.t()) ::
-          Router.dispatch_resp() | {:ok, events :: list(struct())}
+  @spec dispatch(payload :: Payload.t()) :: Router.dispatch_resp()
   def dispatch(%Payload{} = payload) do
     pipeline = to_pipeline(payload)
     telemetry_metadata = telemetry_metadata(pipeline, payload)
