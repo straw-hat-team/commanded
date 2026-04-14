@@ -98,7 +98,7 @@ defmodule Commanded.Commands.CompositeRouter do
       """
       @spec dispatch(
               command :: struct(),
-              timeout_or_opts :: non_neg_integer() | :infinity | Keyword.t()
+              timeout_or_opts :: non_neg_integer() | :infinity | Router.dispatch_options()
             ) :: Router.dispatch_resp()
       def dispatch(command, opts \\ [])
 

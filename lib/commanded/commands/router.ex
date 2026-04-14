@@ -383,10 +383,32 @@ defmodule Commanded.Commands.Router do
           :ok
           | {:ok, aggregate_state :: struct()}
           | {:ok, aggregate_version :: non_neg_integer()}
+          | {:ok, events :: [struct()]}
           | {:ok, execution_result :: ExecutionResult.t()}
           | {:error, :unregistered_command}
           | {:error, :consistency_timeout}
           | {:error, reason :: term()}
+
+  @type dispatch_consistency ::
+          :eventual | :strong | [module() | String.t()]
+
+  @type dispatch_return ::
+          :aggregate_state | :aggregate_version | :events | :execution_result | false
+
+  @type dispatch_option ::
+          {:application, Commanded.Application.t()}
+          | {:causation_id, String.t() | nil}
+          | {:command_uuid, String.t()}
+          | {:consistency, dispatch_consistency()}
+          | {:correlation_id, String.t() | nil}
+          | {:include_aggregate_version, boolean()}
+          | {:include_execution_result, boolean()}
+          | {:metadata, map()}
+          | {:returning, dispatch_return()}
+          | {:retry_attempts, non_neg_integer() | nil}
+          | {:timeout, non_neg_integer() | :infinity}
+
+  @type dispatch_options :: [dispatch_option()]
 
   @doc """
   Dispatch the given command to the registered handler.
@@ -475,7 +497,7 @@ defmodule Commanded.Commands.Router do
   """
   @callback dispatch(
               command :: struct(),
-              timeout_or_opts :: non_neg_integer() | :infinity | Keyword.t()
+              timeout_or_opts :: non_neg_integer() | :infinity | dispatch_options()
             ) :: dispatch_resp()
 
   defmacro __before_compile__(_env) do
