@@ -310,6 +310,9 @@ defmodule Commanded.Application do
         - `causation_id` - an optional UUID used to identify the cause of the
           command being dispatched.
 
+        - `command_uuid` - an optional UUID used to identify the command being
+          dispatched. When omitted, one will be generated automatically.
+
         - `correlation_id` - an optional UUID used to correlate related
           commands/events together.
 

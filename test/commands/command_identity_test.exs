@@ -27,5 +27,21 @@ defmodule Commanded.Commands.CommandIdentityTest do
       :ok = BankApp.dispatch(command, command_uuid: command_uuid)
       assert [^command_uuid] = CommandAuditMiddleware.dispatched_commands(& &1.command_uuid)
     end
+
+    test "should reject nil command_uuid" do
+      command = %OpenAccount{account_number: "ACC123", initial_balance: 1_000}
+
+      assert_raise ArgumentError, "command_uuid must be a binary", fn ->
+        BankApp.dispatch(command, command_uuid: nil)
+      end
+    end
+
+    test "should reject non-binary command_uuid" do
+      command = %OpenAccount{account_number: "ACC123", initial_balance: 1_000}
+
+      assert_raise ArgumentError, "command_uuid must be a binary", fn ->
+        BankApp.dispatch(command, command_uuid: 123)
+      end
+    end
   end
 end
