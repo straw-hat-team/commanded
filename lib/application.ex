@@ -342,6 +342,9 @@ defmodule Commanded.Application do
             - `:aggregate_version` - to include the aggregate stream version
               in the successful response: `{:ok, aggregate_version}`.
 
+            - `:events` - to return the resultant domain events. An empty list
+              will be returned if no events were produced.
+
             - `:execution_result` - to return a `Commanded.Commands.ExecutionResult`
               struct containing the aggregate's identity, version, and any
               events produced from the command along with their associated
@@ -352,8 +355,8 @@ defmodule Commanded.Application do
         - `timeout` - as described above.
 
   Returns `:ok` on success unless the `:returning` option is specified where
-  it returns one of `{:ok, aggregate_state}`, `{:ok, aggregate_version}`, or
-  `{:ok, %Commanded.Commands.ExecutionResult{}}`.
+  it returns one of `{:ok, aggregate_state}`, `{:ok, aggregate_version}`,
+  `{:ok, events}`, or `{:ok, %Commanded.Commands.ExecutionResult{}}`.
 
   Returns `{:error, reason}` on failure.
 

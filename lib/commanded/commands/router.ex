@@ -483,8 +483,8 @@ defmodule Commanded.Commands.Router do
         - `timeout` - as described above.
 
   Returns `:ok` on success unless the `:returning` option is specified where
-  it returns one of `{:ok, aggregate_state}`, `{:ok, aggregate_version}`, or
-  `{:ok, %Commanded.Commands.ExecutionResult{}}`.
+  it returns one of `{:ok, aggregate_state}`, `{:ok, aggregate_version}`,
+  `{:ok, events}`, or `{:ok, %Commanded.Commands.ExecutionResult{}}`.
 
   Returns `{:error, reason}` on failure.
 
