@@ -445,7 +445,7 @@ defmodule Commanded.Commands.Router do
           command being dispatched.
 
         - `command_uuid` - an optional UUID used to identify the command being
-          dispatched.
+          dispatched. When omitted, one will be generated automatically.
 
         - `correlation_id` - an optional UUID used to correlate related
           commands/events together.
@@ -546,7 +546,7 @@ defmodule Commanded.Commands.Router do
 
           application = Keyword.fetch!(opts, :application)
           causation_id = Keyword.get(opts, :causation_id)
-          command_uuid = Keyword.get_lazy(opts, :command_uuid, &UUID.uuid7/0)
+          command_uuid = Router.fetch_command_uuid(opts)
           consistency = Keyword.fetch!(opts, :consistency)
           correlation_id = Keyword.get_lazy(opts, :correlation_id, &UUID.uuid7/0)
           metadata = Keyword.fetch!(opts, :metadata) |> validate_metadata()
@@ -645,6 +645,20 @@ defmodule Commanded.Commands.Router do
       # Make sure the metadata must be Map.t()
       defp validate_metadata(value) when is_map(value), do: value
       defp validate_metadata(_), do: raise(ArgumentError, message: "metadata must be an map")
+    end
+  end
+
+  @doc false
+  def fetch_command_uuid(opts) do
+    case Keyword.fetch(opts, :command_uuid) do
+      {:ok, value} when is_binary(value) ->
+        value
+
+      :error ->
+        UUID.uuid7()
+
+      _ ->
+        raise ArgumentError, message: "command_uuid must be a binary"
     end
   end
 
