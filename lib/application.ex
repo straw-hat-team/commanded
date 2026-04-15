@@ -166,6 +166,7 @@ defmodule Commanded.Application do
   """
 
   @type t :: module
+  @type app_ref :: t | atom
   @type options :: [name: nil | atom]
 
   @doc false
