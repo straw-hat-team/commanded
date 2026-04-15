@@ -23,13 +23,12 @@ defmodule Commanded.SubscriptionsTest do
     end
 
     test "should not remove PID when process terminates" do
-      pid =
-        spawn_link(fn ->
+      {pid, ref} =
+        spawn_monitor(fn ->
           :ok = Subscriptions.register(DefaultApp, "handler1", Handler1, :strong)
         end)
 
-      ref = Process.monitor(pid)
-      assert_receive {:DOWN, ^ref, :process, _, :normal}
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
 
       assert Subscriptions.all(DefaultApp) == [{"handler1", Handler1, pid}]
     end
