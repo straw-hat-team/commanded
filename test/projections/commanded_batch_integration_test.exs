@@ -1,5 +1,5 @@
 defmodule Commanded.Projections.CommandedBatchIntegrationTest do
-  use ExUnit.Case
+  use Commanded.Projections.EctoCase
 
   import Commanded.Projections.ProjectionAssertions
   import Ecto.Query
@@ -7,7 +7,6 @@ defmodule Commanded.Projections.CommandedBatchIntegrationTest do
   alias Commanded.Projections.Events.AnEvent
   alias Commanded.Projections.Projection
   alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
 
   defmodule IntegrationBatchProjector do
     use Commanded.Projections.Ecto,
@@ -24,13 +23,6 @@ defmodule Commanded.Projections.CommandedBatchIntegrationTest do
 
       Ecto.Multi.insert_all(multi, :projections, Commanded.Projections.Projection, projections)
     end
-  end
-
-  setup do
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
-
-    :ok
   end
 
   describe "Commanded batch integration" do

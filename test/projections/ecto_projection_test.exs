@@ -1,12 +1,10 @@
 defmodule Commanded.Projections.EctoProjectionTest do
-  use ExUnit.Case
+  use Commanded.Projections.EctoCase
 
   import Commanded.Projections.ProjectionAssertions
 
   alias Commanded.Projections.Events.{AnEvent, AnotherEvent, ErrorEvent, IgnoredEvent}
   alias Commanded.Projections.Projection
-  alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
 
   defmodule Projector do
     use Commanded.Projections.Ecto,
@@ -25,11 +23,6 @@ defmodule Commanded.Projections.EctoProjectionTest do
     project(%ErrorEvent{}, fn multi ->
       Ecto.Multi.error(multi, :my_projection, :failure)
     end)
-  end
-
-  setup do
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
   end
 
   test "should handle a projected event" do

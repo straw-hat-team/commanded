@@ -56,6 +56,7 @@ defmodule Commanded.Mixfile do
       "test/middleware/support",
       "test/helpers",
       "test/opentelemetry/support",
+      "test/projections/support",
       "test/pubsub/support",
       "test/registration/support",
       "test/subscriptions/support",
