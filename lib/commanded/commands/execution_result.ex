@@ -25,7 +25,7 @@ defmodule Commanded.Commands.ExecutionResult do
           aggregate_state: struct,
           aggregate_version: non_neg_integer(),
           events: list(struct()),
-          metadata: struct()
+          metadata: map()
         }
 
   @enforce_keys [:aggregate_uuid, :aggregate_state, :aggregate_version, :events, :metadata]
