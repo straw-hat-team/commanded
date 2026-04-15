@@ -24,13 +24,15 @@ defmodule Commanded.Event.FailureContext do
   alias Commanded.EventStore.EnrichedMetadata
 
   @type t :: %__MODULE__{
-          application: Commanded.Application.t(),
+          application: Commanded.Application.app_ref(),
           handler_name: String.t(),
           handler_state: nil | any(),
           context: map(),
           metadata: EnrichedMetadata.t(),
           stacktrace: Exception.stacktrace() | nil
         }
+
+  @enforce_keys [:application, :handler_name, :context, :metadata]
 
   defstruct [
     :application,
