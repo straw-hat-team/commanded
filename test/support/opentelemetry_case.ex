@@ -25,15 +25,14 @@ defmodule Commanded.OpenTelemetryCase do
   end
 
   setup do
-    previous_env = Application.get_all_env(:opentelemetry)
-    previously_started? = started?(:opentelemetry)
+    :application.stop(:opentelemetry)
+    :application.set_env(:opentelemetry, :tracer, :otel_tracer_default)
 
-    restart_opentelemetry(
-      tracer: :otel_tracer_default,
-      processors: [
-        {:otel_batch_processor, %{scheduled_delay_ms: 1, exporter: {:otel_exporter_pid, self()}}}
-      ]
-    )
+    :application.set_env(:opentelemetry, :processors, [
+      {:otel_batch_processor, %{scheduled_delay_ms: 1, exporter: {:otel_exporter_pid, self()}}}
+    ])
+
+    :application.start(:opentelemetry)
 
     on_exit(fn ->
       commanded_events = [
@@ -62,54 +61,8 @@ defmodule Commanded.OpenTelemetryCase do
           handler <- :telemetry.list_handlers(event) do
         :telemetry.detach(handler.id)
       end
-
-      restore_opentelemetry(previous_env, previously_started?)
     end)
 
     :ok
-  end
-
-  defp started?(application) do
-    Enum.any?(Application.started_applications(), fn {started_application, _description, _version} ->
-      started_application == application
-    end)
-  end
-
-  defp restart_opentelemetry(env) do
-    stop_opentelemetry()
-
-    Enum.each(env, fn {key, value} ->
-      Application.put_env(:opentelemetry, key, value)
-    end)
-
-    Application.start(:opentelemetry)
-  end
-
-  defp restore_opentelemetry(previous_env, previously_started?) do
-    stop_opentelemetry()
-
-    current_keys =
-      :opentelemetry
-      |> Application.get_all_env()
-      |> Keyword.keys()
-
-    Enum.each(current_keys -- Keyword.keys(previous_env), fn key ->
-      Application.delete_env(:opentelemetry, key)
-    end)
-
-    Enum.each(previous_env, fn {key, value} ->
-      Application.put_env(:opentelemetry, key, value)
-    end)
-
-    if previously_started? do
-      Application.start(:opentelemetry)
-    end
-  end
-
-  defp stop_opentelemetry do
-    case Application.stop(:opentelemetry) do
-      :ok -> :ok
-      {:error, {:not_started, :opentelemetry}} -> :ok
-    end
   end
 end
