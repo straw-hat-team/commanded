@@ -40,6 +40,21 @@ defmodule Commanded.Middleware.Pipeline do
     - `response` - sets the response to send back to the caller.
 
   """
+  @type t :: %__MODULE__{
+          application: Commanded.Application.app_ref() | nil,
+          causation_id: String.t() | nil,
+          correlation_id: String.t() | nil,
+          command: struct() | nil,
+          command_uuid: String.t() | nil,
+          consistency: Commanded.Commands.Router.dispatch_consistency() | nil,
+          identity: (atom() | (struct() -> term())) | nil,
+          identity_prefix: nil | String.t() | (-> String.t()),
+          metadata: map() | nil,
+          response: term() | nil,
+          assigns: map(),
+          halted: boolean()
+        }
+
   defstruct [
     :application,
     :causation_id,

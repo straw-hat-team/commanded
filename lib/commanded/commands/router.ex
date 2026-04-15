@@ -396,7 +396,7 @@ defmodule Commanded.Commands.Router do
           :aggregate_state | :aggregate_version | :events | :execution_result | false
 
   @type dispatch_option ::
-          {:application, Commanded.Application.t()}
+          {:application, Commanded.Application.app_ref()}
           | {:causation_id, String.t() | nil}
           | {:command_uuid, String.t()}
           | {:consistency, dispatch_consistency()}

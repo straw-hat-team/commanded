@@ -11,7 +11,41 @@ defmodule Commanded.Commands.Dispatcher do
   defmodule Payload do
     @moduledoc false
 
-    @type t :: %Payload{}
+    @type t :: %__MODULE__{
+            application: Commanded.Application.app_ref(),
+            command: struct(),
+            command_uuid: String.t(),
+            causation_id: String.t() | nil,
+            correlation_id: String.t() | nil,
+            consistency: Router.dispatch_consistency(),
+            handler_module: module(),
+            handler_function: atom(),
+            handler_before_execute: nil | atom(),
+            aggregate_module: module(),
+            identity: atom() | (struct() -> term()),
+            identity_prefix: nil | String.t() | (-> String.t()),
+            timeout: non_neg_integer() | :infinity,
+            lifespan: module(),
+            metadata: map(),
+            retry_attempts: non_neg_integer() | nil,
+            returning: Router.dispatch_return(),
+            middleware: [module()]
+          }
+
+    @enforce_keys [
+      :application,
+      :command,
+      :command_uuid,
+      :consistency,
+      :handler_module,
+      :handler_function,
+      :aggregate_module,
+      :identity,
+      :timeout,
+      :lifespan,
+      :metadata,
+      :returning
+    ]
 
     defstruct [
       :application,
