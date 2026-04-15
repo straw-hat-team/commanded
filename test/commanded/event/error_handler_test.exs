@@ -9,7 +9,7 @@ defmodule Commanded.Event.ErrorHandlerTest do
   end
 
   test "Stop on error" do
-    context = %FailureContext{}
+    context = failure_context()
     error = {:error, "an error"}
 
     result = ErrorHandler.stop_on_error(error, an_event(), context)
@@ -18,7 +18,7 @@ defmodule Commanded.Event.ErrorHandlerTest do
 
   describe "backoff" do
     test "the first delay is 1 second" do
-      context = %FailureContext{context: %{}}
+      context = failure_context()
 
       {:retry, delay, context} =
         ErrorHandler.backoff(an_error(), an_event(), context, jitter_fn: no_jitter())
@@ -37,7 +37,7 @@ defmodule Commanded.Event.ErrorHandlerTest do
     end
 
     test "backs off exponentially-ish" do
-      failure_context = %FailureContext{context: %{}}
+      failure_context = failure_context()
 
       expectations = [
         {1, 1_000},
@@ -66,7 +66,7 @@ defmodule Commanded.Event.ErrorHandlerTest do
 
     test "maxes out at 1 day" do
       # We should hit the max after 294 failures
-      context = %FailureContext{context: %{failures: 500}}
+      context = failure_context(%{failures: 500})
 
       {:retry, actual_delay, _context} =
         ErrorHandler.backoff(an_error(), an_event(), context, jitter_fn: no_jitter())
@@ -122,5 +122,27 @@ defmodule Commanded.Event.ErrorHandlerTest do
   defp an_event, do: %Event{id: 123}
   defp an_error, do: {:error, "Invalid pizza toppings"}
   defp no_jitter, do: fn -> 0 end
-  defp failure_context, do: %FailureContext{context: %{}}
+
+  defp failure_context(context \\ %{}) do
+    %FailureContext{
+      application: MyApp.CommandedApp,
+      handler_name: "MyApp.FailingEventHandler",
+      handler_state: nil,
+      context: context,
+      metadata: %{
+        event_id: "0f117f39-3b2f-491e-b39d-9325fd1d19d1",
+        event_number: 1,
+        stream_id: "2iO5kHYbIAGW1rrZ7FeHCRMvbT5",
+        stream_version: 1,
+        correlation_id: "e9c3b49e-0ac5-44db-8ddb-83835a7c9437",
+        causation_id: "49d9a83c-8bcd-4fa9-9ccb-3c196717415c",
+        created_at: ~U[2024-06-25 20:55:24.576545Z],
+        application: MyApp.CommandedApp,
+        handler_name: "MyApp.FailingEventHandler",
+        state: nil,
+        metadata: %{}
+      },
+      stacktrace: nil
+    }
+  end
 end
