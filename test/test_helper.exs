@@ -1,19 +1,3 @@
-alias Commanded.Projections.Repo
-
-{:ok, _} = Repo.start_link()
-
-defmodule CreateProjections do
-  use Ecto.Migration
-
-  def change do
-    create table(:projections) do
-      add(:name, :text)
-    end
-  end
-end
-
-Ecto.Migrator.up(Repo, 20_171_001_000_000, CreateProjections)
+{:ok, _} = Commanded.TestSupport.ProjectionsSetup.start_link()
 
 ExUnit.start()
-
-Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
