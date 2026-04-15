@@ -24,11 +24,11 @@ defmodule Commanded.Event.FailureContext do
   alias Commanded.EventStore.EnrichedMetadata
 
   @type t :: %__MODULE__{
-          application: Commanded.Application.t(),
-          handler_name: String.t(),
+          application: Commanded.Application.app_ref() | nil,
+          handler_name: String.t() | nil,
           handler_state: nil | any(),
-          context: map(),
-          metadata: EnrichedMetadata.t(),
+          context: map() | nil,
+          metadata: EnrichedMetadata.t() | nil,
           stacktrace: Exception.stacktrace() | nil
         }
 
