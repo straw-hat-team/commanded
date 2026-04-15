@@ -1,8 +1,5 @@
 defmodule Commanded.Projections.InitCallbackTest do
-  use ExUnit.Case
-
-  alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
+  use Commanded.Projections.EctoCase
 
   defmodule InitProjector do
     use Commanded.Projections.Ecto,
@@ -18,11 +15,6 @@ defmodule Commanded.Projections.InitCallbackTest do
 
       {:ok, config}
     end
-  end
-
-  setup do
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
   end
 
   describe "`init/1` callback function" do

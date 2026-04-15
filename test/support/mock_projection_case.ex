@@ -7,6 +7,7 @@ defmodule Commanded.MockProjectionCase do
 
   alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
   alias Commanded.Projections.Repo
+  alias Commanded.Projections.Setup
   alias Commanded.TestSupport.MockEventStoreHelpers
   alias Ecto.Adapters.SQL.Sandbox
 
@@ -20,6 +21,14 @@ defmodule Commanded.MockProjectionCase do
   end
 
   setup [:set_mox_global, :stub_event_store, :verify_on_exit!]
+
+  setup_all do
+    start_supervised!(Repo)
+    :ok = Setup.ensure_projection_tables!()
+    :ok = Sandbox.mode(Repo, :manual)
+
+    :ok
+  end
 
   setup do
     start_supervised!({TestApplication, event_store: [adapter: MockEventStore]})

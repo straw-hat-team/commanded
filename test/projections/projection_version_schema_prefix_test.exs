@@ -1,9 +1,8 @@
 defmodule Commanded.Projections.ProjectionVersionSchemaPrefixTest do
-  use ExUnit.Case
+  use Commanded.Projections.EctoCase
 
   alias Commanded.Projections.Events.SchemaEvent
   alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
 
   setup do
     ecto_config = Application.get_env(:commanded, Commanded.Projections.Ecto)
@@ -16,8 +15,7 @@ defmodule Commanded.Projections.ProjectionVersionSchemaPrefixTest do
       end
     end)
 
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
+    :ok
   end
 
   describe "schema prefix" do

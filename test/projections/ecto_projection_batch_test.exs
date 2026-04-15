@@ -1,12 +1,10 @@
 defmodule Commanded.Projections.EctoProjectionBatchTest do
-  use ExUnit.Case
+  use Commanded.Projections.EctoCase
 
   import Commanded.Projections.ProjectionAssertions
 
   alias Commanded.Projections.Events.{AnEvent, AnotherEvent, ErrorEvent}
   alias Commanded.Projections.Projection
-  alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
 
   defmodule BatchProjector do
     use Commanded.Projections.Ecto,
@@ -29,11 +27,6 @@ defmodule Commanded.Projections.EctoProjectionBatchTest do
         Ecto.Multi.insert_all(multi, :projection, Projection, projections)
       end
     end
-  end
-
-  setup do
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
   end
 
   test "should handle multiple projected events" do

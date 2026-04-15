@@ -1,10 +1,8 @@
 defmodule Commanded.Projections.AfterUpdateCallbackTest do
-  use ExUnit.Case
+  use Commanded.Projections.EctoCase
 
   alias Commanded.Projections.Events.AnEvent
   alias Commanded.Projections.Projection
-  alias Commanded.Projections.Repo
-  alias Ecto.Adapters.SQL.Sandbox
 
   defmodule Projector do
     use Commanded.Projections.Ecto,
@@ -23,11 +21,6 @@ defmodule Commanded.Projections.AfterUpdateCallbackTest do
 
       :ok
     end
-  end
-
-  setup do
-    start_supervised!(TestApplication)
-    Sandbox.checkout(Repo)
   end
 
   test "should call `after_update/3` function with event, metadata, and changes" do
