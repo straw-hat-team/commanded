@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.6.1](https://github.com/straw-hat-team/commanded/compare/v3.6.0...v3.6.1) (2026-04-16)
+
+
+### Bug Fixes
+
+* **github:** Pin release-please-action to commit SHA ([#85](https://github.com/straw-hat-team/commanded/issues/85)) ([15bbdc5](https://github.com/straw-hat-team/commanded/commit/15bbdc5691019832207a271ed33eda11a526e47b))
+* **telemetry:** Keep event store spans tied to their destination ([#83](https://github.com/straw-hat-team/commanded/issues/83)) ([e4b49a7](https://github.com/straw-hat-team/commanded/commit/e4b49a74b5dc13a18ea27402640285d613625e07))
+
 ## [3.6.0](https://github.com/straw-hat-team/commanded/compare/v3.5.0...v3.6.0) (2026-04-16)
 
 
