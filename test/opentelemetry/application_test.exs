@@ -234,6 +234,105 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
              }
     end
 
+    test "allows returned error status to stay unset" do
+      detach_handlers()
+      test_pid = self()
+
+      OTelApplication.setup(
+        error_status: fn event_name, measurements, meta, config ->
+          send(test_pid, {:error_status_callback, event_name, measurements, meta, config})
+          :unset
+        end
+      )
+
+      causation_id = UUID.uuid4()
+      correlation_id = UUID.uuid4()
+
+      meta =
+        Factory.build_application_dispatch_metadata(
+          causation_id: causation_id,
+          correlation_id: correlation_id
+        )
+
+      :telemetry.execute([:commanded, :application, :dispatch, :start], %{}, meta)
+
+      stop_meta = Map.put(meta, :error, :validation_failed)
+
+      :telemetry.execute(
+        [:commanded, :application, :dispatch, :stop],
+        %{duration: 1000},
+        stop_meta
+      )
+
+      assert_receive {:span,
+                      span(
+                        name: "dispatch Commanded.TestSupport.TestDomain.Account",
+                        status: status,
+                        attributes: span_attrs
+                      )},
+                     1000
+
+      assert_receive {:error_status_callback, callback_event_name, callback_measurements,
+                      callback_meta, callback_config},
+                     1000
+
+      assert callback_event_name == [:commanded, :application, :dispatch, :stop]
+      assert callback_measurements.duration == 1000
+      assert callback_meta.error == :validation_failed
+      assert is_function(Keyword.fetch!(callback_config, :error_status), 4)
+      assert status == {:status, :unset, ""}
+      assert :otel_attributes.map(span_attrs)[:"error.type"] == "validation_failed"
+    end
+
+    test "uses the formatted error message when callback returns error" do
+      detach_handlers()
+
+      OTelApplication.setup(
+        error_status: fn _event_name, _measurements, _meta, _config -> :error end
+      )
+
+      meta = Factory.build_application_dispatch_metadata()
+
+      :telemetry.execute([:commanded, :application, :dispatch, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :application, :dispatch, :stop],
+        %{duration: 1000},
+        Map.put(meta, :error, :validation_failed)
+      )
+
+      assert_receive {:span, span(status: {:status, :error, error_message})},
+                     1000
+
+      assert error_message == ":validation_failed"
+    end
+
+    test "keeps exception status handling unchanged when error_status is configured" do
+      detach_handlers()
+
+      OTelApplication.setup(
+        error_status: fn _event_name, _measurements, _meta, _config -> :unset end
+      )
+
+      {_event_name, _measurements, meta} =
+        Factory.build_telemetry_event(:application_dispatch_exception,
+          reason: %ArgumentError{message: "invalid command argument"}
+        )
+
+      :telemetry.execute([:commanded, :application, :dispatch, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :application, :dispatch, :exception],
+        %{duration: 100},
+        meta
+      )
+
+      assert_receive {:span, span(status: {:status, :error, error_msg})},
+                     1000
+
+      assert error_msg == "** (ArgumentError) invalid command argument"
+    end
+
     test "handles ArgumentError exception" do
       {_event_name, _measurements, meta} =
         Factory.build_telemetry_event(:application_dispatch_exception,

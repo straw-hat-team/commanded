@@ -324,6 +324,64 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
              }
     end
 
+    test "allows returned aggregate error status to stay unset" do
+      detach_handlers()
+
+      OTelAggregate.setup(
+        error_status: fn _event_name, _measurements, _meta, _config -> :unset end
+      )
+
+      aggregate_uuid = UUID.uuid4()
+      causation_id = UUID.uuid4()
+      correlation_id = UUID.uuid4()
+
+      meta =
+        Factory.build_aggregate_execute_metadata(
+          aggregate_uuid: aggregate_uuid,
+          causation_id: causation_id,
+          correlation_id: correlation_id
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :execute, :start], %{}, meta)
+
+      stop_meta = Map.put(meta, :error, :validation_failed)
+      :telemetry.execute([:commanded, :aggregate, :execute, :stop], %{duration: 1000}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "execute Commanded.TestSupport.TestDomain.Account",
+                        status: status,
+                        attributes: span_attrs
+                      )},
+                     1000
+
+      assert status == {:status, :unset, ""}
+      assert :otel_attributes.map(span_attrs)[:"error.type"] == "validation_failed"
+    end
+
+    test "uses the formatted aggregate error message when callback returns error" do
+      detach_handlers()
+
+      OTelAggregate.setup(
+        error_status: fn _event_name, _measurements, _meta, _config -> :error end
+      )
+
+      meta = Factory.build_aggregate_execute_metadata(aggregate_uuid: UUID.uuid4())
+
+      :telemetry.execute([:commanded, :aggregate, :execute, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :aggregate, :execute, :stop],
+        %{duration: 1000},
+        Map.put(meta, :error, :validation_failed)
+      )
+
+      assert_receive {:span, span(status: {:status, :error, error_message})},
+                     1000
+
+      assert error_message == ":validation_failed"
+    end
+
     test "handles ArgumentError exception" do
       # Commanded's rescue blocks always emit kind: :error
       {_event_name, _measurements, meta} =

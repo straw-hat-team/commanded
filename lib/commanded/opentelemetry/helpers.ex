@@ -1,6 +1,8 @@
 defmodule Commanded.OpenTelemetry.Helpers do
   @moduledoc false
 
+  alias OpenTelemetry.Span
+
   def extract_propagated_ctx(nil), do: {[], :undefined}
 
   def extract_propagated_ctx(metadata) when is_map(metadata) do
@@ -64,6 +66,41 @@ defmodule Commanded.OpenTelemetry.Helpers do
   def format_error(%{__exception__: true} = exception), do: Exception.message(exception)
   def format_error(error) when is_binary(error), do: error
   def format_error(error), do: inspect(error)
+
+  def set_error_status(ctx, error, event_name, measurements, meta, config, tracer_id) do
+    status_code =
+      case Keyword.get(config, :error_status) do
+        nil -> :error
+        fun when is_function(fun, 4) -> fun.(event_name, measurements, meta, config)
+      end
+
+    apply_error_status(ctx, status_code, error, tracer_id)
+  end
+
+  defp apply_error_status(_ctx, nil, _error, _tracer_id), do: :ok
+
+  defp apply_error_status(ctx, :error, error, _tracer_id) do
+    Span.set_status(ctx, OpenTelemetry.status(:error, format_error(error)))
+  end
+
+  defp apply_error_status(ctx, code, _error, _tracer_id) when code in [:unset, :ok] do
+    Span.set_status(ctx, OpenTelemetry.status(code))
+  end
+
+  defp apply_error_status(ctx, status_code, error, tracer_id) do
+    :telemetry.execute(
+      [:commanded, :opentelemetry, :warning],
+      %{count: 1},
+      %{
+        message: "Unknown error status encountered, falling back to error status",
+        error: error,
+        error_status: status_code,
+        tracer_id: tracer_id
+      }
+    )
+
+    Span.set_status(ctx, OpenTelemetry.status(:error, format_error(error)))
+  end
 
   def module_name(nil), do: nil
   def module_name(module) when is_atom(module), do: inspect(module)
