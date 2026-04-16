@@ -69,7 +69,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
       |> maybe_add_start_from(meta[:start_from])
 
     span_name =
-      case destination_name || Helpers.module_name(meta[:application]) do
+      case destination_name do
         nil -> action_name
         name -> "#{action_name} #{name}"
       end
@@ -193,15 +193,11 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp extract_source_uuid(_), do: nil
 
   defp event_store_destination_name(meta) do
-    case to_destination_name(meta[:event_store_name]) do
-      nil ->
-        meta[:application]
-        |> lookup_event_store_name()
-        |> to_destination_name()
-
-      destination_name ->
-        destination_name
-    end
+    to_destination_name(meta[:event_store_name]) ||
+      meta[:application]
+      |> lookup_event_store_name()
+      |> to_destination_name() ||
+      Helpers.module_name(meta[:application])
   end
 
   defp lookup_event_store_name(nil), do: nil
