@@ -2,14 +2,9 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
   import Commanded.SharedTestCase
 
   define_tests do
-    alias Commanded.EventStore.{EventData, RecordedEvent, Subscriber}
+    alias Commanded.EventStore.{AdapterTestData, RecordedEvent, Subscriber}
     alias Commanded.Helpers.ProcessHelper
     alias Commanded.UUID
-
-    defmodule BankAccountOpened do
-      @derive Jason.Encoder
-      defstruct [:account_number, :initial_balance]
-    end
 
     describe "transient subscription to single stream" do
       test "should receive events appended to the stream", %{
@@ -899,18 +894,8 @@ defmodule Commanded.EventStore.SubscriptionTestCase do
       end
     end
 
-    defp build_event(account_number) do
-      %EventData{
-        causation_id: UUID.uuid4(),
-        correlation_id: UUID.uuid4(),
-        event_type: "#{__MODULE__}.BankAccountOpened",
-        data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-        metadata: %{"user_id" => "test"}
-      }
-    end
-
     defp build_events(count) do
-      for account_number <- 1..count, do: build_event(account_number)
+      AdapterTestData.build_opened_events(count)
     end
   end
 end

@@ -2,13 +2,7 @@ defmodule Commanded.EventStore.SnapshotTestCase do
   import Commanded.SharedTestCase
 
   define_tests do
-    alias Commanded.EventStore.SnapshotData
-    alias Commanded.UUID
-
-    defmodule BankAccountOpened do
-      @derive Jason.Encoder
-      defstruct [:account_number, :initial_balance]
-    end
+    alias Commanded.EventStore.AdapterTestData
 
     describe "record a snapshot" do
       test "should record the snapshot", %{
@@ -66,16 +60,8 @@ defmodule Commanded.EventStore.SnapshotTestCase do
       end
     end
 
-    defp build_snapshot_data(account_number) do
-      %SnapshotData{
-        source_uuid: UUID.uuid4(),
-        source_version: account_number,
-        source_type: "#{__MODULE__}.BankAccountOpened",
-        data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-        metadata: nil,
-        created_at: DateTime.utc_now()
-      }
-    end
+    defp build_snapshot_data(account_number),
+      do: AdapterTestData.build_snapshot_data(account_number)
 
     defp snapshot_timestamps_within_delta?(snapshot, other_snapshot, delta_seconds) do
       DateTime.diff(snapshot.created_at, other_snapshot.created_at, :second) < delta_seconds
