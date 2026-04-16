@@ -5,10 +5,9 @@ defmodule Commanded.EventStore.TelemetryTest do
 
   alias Commanded.DefaultApp
   alias Commanded.EventStore
+  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
-  alias Commanded.EventStore.EventData
   alias Commanded.EventStore.RecordedEvent
-  alias Commanded.EventStore.SnapshotData
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
   alias Commanded.MockedApp
@@ -40,7 +39,7 @@ defmodule Commanded.EventStore.TelemetryTest do
 
   describe "snapshotting telemetry events" do
     test "emit `[:commanded, :event_store, :record_snapshot, :start | :stop]` event" do
-      snapshot = %SnapshotData{}
+      snapshot = build_snapshot()
       assert :ok = EventStore.record_snapshot(DefaultApp, snapshot)
 
       assert_receive {[:commanded, :event_store, :record_snapshot, :start], 1, _meas, _meta}
@@ -85,7 +84,7 @@ defmodule Commanded.EventStore.TelemetryTest do
 
     test "emit stream_forward start/stop when adapter returns a list (before caller enumerates)" do
       uuid = UUID.uuid4()
-      assert :ok = EventStore.append_to_stream(DefaultApp, uuid, 0, [%EventData{}])
+      assert :ok = EventStore.append_to_stream(DefaultApp, uuid, 0, build_events(1))
 
       assert_receive {[:commanded, :event_store, :append_to_stream, :start], 1, _meas, _meta}
       assert_receive {[:commanded, :event_store, :append_to_stream, :stop], 2, _meas, _meta}
@@ -192,7 +191,7 @@ defmodule Commanded.EventStore.TelemetryTest do
   describe "append_to_stream telemetry events" do
     test "emit `[:commanded, :event_store, :append_to_stream, :start | :stop]` event" do
       uuid = UUID.uuid4()
-      assert :ok = EventStore.append_to_stream(DefaultApp, uuid, 0, [%EventData{}])
+      assert :ok = EventStore.append_to_stream(DefaultApp, uuid, 0, build_events(1))
 
       assert_receive {[:commanded, :event_store, :append_to_stream, :start], 1, _meas, _meta}
       assert_receive {[:commanded, :event_store, :append_to_stream, :stop], 2, _meas, meta}
@@ -319,5 +318,11 @@ defmodule Commanded.EventStore.TelemetryTest do
     on_exit(fn ->
       :telemetry.detach(handler)
     end)
+  end
+
+  defp build_events(count), do: AdapterTestData.build_opened_events(count)
+
+  defp build_snapshot(source_uuid \\ UUID.uuid4()) do
+    AdapterTestData.build_snapshot_data(5, source_uuid: source_uuid)
   end
 end

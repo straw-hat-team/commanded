@@ -1,21 +1,14 @@
 defmodule Commanded.EventStore.RecordedEventTest do
   use ExUnit.Case
 
+  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.EnrichedMetadata
   alias Commanded.EventStore.RecordedEvent
-  alias Commanded.Helpers.EventFactory
-
-  defmodule BankAccountOpened do
-    @derive Jason.Encoder
-    defstruct [:account_number, :initial_balance]
-  end
 
   setup do
     [event] =
-      EventFactory.map_to_recorded_events(
-        [
-          %BankAccountOpened{account_number: "123", initial_balance: 1_000}
-        ],
+      AdapterTestData.build_recorded_events(
+        [AdapterTestData.build_opened_event(account_number: "123")],
         1,
         metadata: %{"key1" => "value1", "key2" => "value2"}
       )
@@ -55,6 +48,21 @@ defmodule Commanded.EventStore.RecordedEventTest do
                state: nil,
                metadata: %{"key1" => "value1", "key2" => "value2"}
              } = enriched_metadata
+    end
+
+    test "keeps explicit event ids when mapping recorded events" do
+      transfer_uuid = Commanded.UUID.uuid4()
+
+      [event] =
+        AdapterTestData.build_recorded_events([
+          AdapterTestData.build_deposited_event(
+            account_number: "123",
+            transfer_uuid: transfer_uuid
+          )
+        ])
+
+      assert event.event_id == transfer_uuid
+      assert event.data.transfer_uuid == transfer_uuid
     end
   end
 end
