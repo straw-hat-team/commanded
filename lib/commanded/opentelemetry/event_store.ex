@@ -201,18 +201,24 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp lookup_event_store_name(nil), do: nil
 
   defp lookup_event_store_name(application) do
-    adapter_meta =
-      application
-      |> CommandedApplication.event_store_adapter()
-      |> elem(1)
+    application
+    |> fetch_event_store_adapter_meta()
+    |> event_store_name()
+  end
 
-    if is_map(adapter_meta) do
-      Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
-    end
+  defp fetch_event_store_adapter_meta(application) do
+    {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
+    adapter_meta
   rescue
     ArgumentError -> nil
+    MatchError -> nil
     RuntimeError -> nil
   end
+
+  defp event_store_name(adapter_meta) when is_map(adapter_meta),
+    do: Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
+
+  defp event_store_name(_), do: nil
 
   defp to_destination_name(nil), do: nil
   defp to_destination_name(name) when is_binary(name), do: name
