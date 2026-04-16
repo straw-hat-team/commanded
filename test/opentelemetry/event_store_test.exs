@@ -485,8 +485,13 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
     destination_name = Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
 
-    inspect(destination_name)
+    to_expected_destination_name(destination_name)
   end
+
+  defp to_expected_destination_name(nil), do: nil
+  defp to_expected_destination_name(name) when is_binary(name), do: name
+  defp to_expected_destination_name(name) when is_atom(name), do: inspect(name)
+  defp to_expected_destination_name(_), do: nil
 
   defp build_snapshot(source_uuid) do
     %SnapshotData{
