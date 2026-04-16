@@ -4,8 +4,6 @@ defmodule Commanded.Projections.ErrorCallbackTest do
   import Commanded.Projections.ProjectionAssertions
   import ExUnit.CaptureLog
 
-  alias Commanded.EventStore.RecordedEvent
-
   alias Commanded.Projections.Events.{
     AnEvent,
     ErrorEvent,
@@ -16,7 +14,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
 
   alias Commanded.Projections.Projection
   alias Commanded.Projections.Repo
-  alias Commanded.UUID
+  alias Commanded.TestSupport.Factory
   alias Ecto.Adapters.SQL.Sandbox
 
   describe "error handling" do
@@ -28,9 +26,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       event = %ErrorEvent{pid: self()}
       metadata = %{handler_name: "ErrorProjector", event_number: 1}
 
-      events = [
-        %RecordedEvent{event_number: 1, event_id: UUID.uuid4(), data: event, metadata: metadata}
-      ]
+      events = [build_projection_event(event, 1, metadata)]
 
       send(projector, {:events, events})
 
@@ -41,9 +37,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       event = %RaiseEvent{pid: self(), message: "it crashed, it crashed, it crashed"}
       metadata = %{event_number: 1}
 
-      events = [
-        %RecordedEvent{event_number: 1, event_id: UUID.uuid4(), data: event, metadata: metadata}
-      ]
+      events = [build_projection_event(event, 1, metadata)]
 
       log =
         capture_log(fn ->
@@ -66,9 +60,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       event = %ErrorEvent{pid: self()}
       metadata = %{event_number: 1}
 
-      events = [
-        %RecordedEvent{event_number: 1, event_id: UUID.uuid4(), data: event, metadata: metadata}
-      ]
+      events = [build_projection_event(event, 1, metadata)]
 
       send(projector, {:events, events})
 
@@ -80,9 +72,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       event = %ExceptionEvent{pid: self()}
       metadata = %{event_number: 1}
 
-      events = [
-        %RecordedEvent{event_number: 1, event_id: UUID.uuid4(), data: event, metadata: metadata}
-      ]
+      events = [build_projection_event(event, 1, metadata)]
 
       send(projector, {:events, events})
 
@@ -94,9 +84,7 @@ defmodule Commanded.Projections.ErrorCallbackTest do
       event = %InvalidMultiEvent{pid: self()}
       metadata = %{event_number: 1}
 
-      events = [
-        %RecordedEvent{event_number: 1, event_id: UUID.uuid4(), data: event, metadata: metadata}
-      ]
+      events = [build_projection_event(event, 1, metadata)]
 
       send(projector, {:events, events})
 
@@ -106,24 +94,9 @@ defmodule Commanded.Projections.ErrorCallbackTest do
 
     test "should continue on error after skipping problematic events", %{projector: projector} do
       events = [
-        %RecordedEvent{
-          event_number: 1,
-          event_id: UUID.uuid4(),
-          data: %ErrorEvent{pid: self()},
-          metadata: %{event_number: 1}
-        },
-        %RecordedEvent{
-          event_number: 2,
-          event_id: UUID.uuid4(),
-          data: %ExceptionEvent{pid: self()},
-          metadata: %{event_number: 2}
-        },
-        %RecordedEvent{
-          event_number: 3,
-          event_id: UUID.uuid4(),
-          data: %AnEvent{pid: self()},
-          metadata: %{event_number: 3}
-        }
+        build_projection_event(%ErrorEvent{pid: self()}, 1, %{event_number: 1}),
+        build_projection_event(%ExceptionEvent{pid: self()}, 2, %{event_number: 2}),
+        build_projection_event(%AnEvent{pid: self()}, 3, %{event_number: 3})
       ]
 
       send(projector, {:events, events})
@@ -144,5 +117,14 @@ defmodule Commanded.Projections.ErrorCallbackTest do
     Sandbox.allow(Repo, self(), projector)
 
     [projector: projector]
+  end
+
+  defp build_projection_event(event, event_number, metadata) do
+    Factory.build_recorded_event(
+      data: event,
+      event_number: event_number,
+      stream_version: event_number,
+      metadata: metadata
+    )
   end
 end

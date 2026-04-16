@@ -1,6 +1,7 @@
 defmodule Commanded.TestSupport.Factory do
   alias Commanded.Aggregates.ExecutionContext
   alias Commanded.EventStore.RecordedEvent
+  alias Commanded.Helpers.EventFactory
   alias Commanded.TestSupport.TestDomain
   alias Commanded.UUID
 
@@ -127,39 +128,66 @@ defmodule Commanded.TestSupport.Factory do
   def build_recorded_event(opts) when is_list(opts) do
     account_id = Keyword.get(opts, :account_id, UUID.uuid4())
 
-    default_data = %TestDomain.AccountOpened{
-      account_id: account_id,
-      owner: "Test",
-      initial_balance: 1000
-    }
+    data =
+      Keyword.get_lazy(opts, :data, fn ->
+        %TestDomain.AccountOpened{
+          account_id: account_id,
+          owner: "Test",
+          initial_balance: 1000
+        }
+      end)
 
-    defaults = [
-      event_id: UUID.uuid4(),
-      event_number: 1,
-      stream_id: "account-#{account_id}",
-      stream_version: 1,
-      causation_id: UUID.uuid4(),
-      correlation_id: UUID.uuid4(),
-      event_type: "Elixir.Commanded.TestSupport.TestDomain.AccountOpened",
-      data: default_data,
-      created_at: DateTime.utc_now(),
-      metadata: %{}
-    ]
+    event_number = Keyword.get(opts, :event_number, 1)
 
-    opts = Keyword.merge(defaults, opts)
+    case data do
+      %{__struct__: _} ->
+        [%RecordedEvent{} = recorded_event] =
+          EventFactory.map_to_recorded_events(
+            [data],
+            event_number,
+            stream_id: Keyword.get(opts, :stream_id, "account-#{account_id}"),
+            causation_id: Keyword.get_lazy(opts, :causation_id, &UUID.uuid4/0),
+            correlation_id: Keyword.get_lazy(opts, :correlation_id, &UUID.uuid4/0),
+            metadata: Keyword.get(opts, :metadata, %{})
+          )
 
-    %RecordedEvent{
-      event_id: Keyword.fetch!(opts, :event_id),
-      event_number: Keyword.fetch!(opts, :event_number),
-      stream_id: Keyword.fetch!(opts, :stream_id),
-      stream_version: Keyword.fetch!(opts, :stream_version),
-      causation_id: Keyword.fetch!(opts, :causation_id),
-      correlation_id: Keyword.fetch!(opts, :correlation_id),
-      event_type: Keyword.fetch!(opts, :event_type),
-      data: Keyword.fetch!(opts, :data),
-      created_at: Keyword.fetch!(opts, :created_at),
-      metadata: Keyword.fetch!(opts, :metadata)
-    }
+        %RecordedEvent{
+          recorded_event
+          | event_id: Keyword.get(opts, :event_id, recorded_event.event_id),
+            stream_version: Keyword.get(opts, :stream_version, recorded_event.stream_version),
+            event_type: Keyword.get(opts, :event_type, recorded_event.event_type),
+            created_at: Keyword.get(opts, :created_at, recorded_event.created_at)
+        }
+
+      _ ->
+        defaults = [
+          event_id: UUID.uuid4(),
+          event_number: event_number,
+          stream_id: "account-#{account_id}",
+          stream_version: event_number,
+          causation_id: UUID.uuid4(),
+          correlation_id: UUID.uuid4(),
+          event_type: "Elixir.Commanded.TestSupport.TestDomain.AccountOpened",
+          data: data,
+          created_at: DateTime.utc_now(),
+          metadata: %{}
+        ]
+
+        opts = Keyword.merge(defaults, opts)
+
+        %RecordedEvent{
+          event_id: Keyword.fetch!(opts, :event_id),
+          event_number: Keyword.fetch!(opts, :event_number),
+          stream_id: Keyword.fetch!(opts, :stream_id),
+          stream_version: Keyword.fetch!(opts, :stream_version),
+          causation_id: Keyword.fetch!(opts, :causation_id),
+          correlation_id: Keyword.fetch!(opts, :correlation_id),
+          event_type: Keyword.fetch!(opts, :event_type),
+          data: Keyword.fetch!(opts, :data),
+          created_at: Keyword.fetch!(opts, :created_at),
+          metadata: Keyword.fetch!(opts, :metadata)
+        }
+    end
   end
 
   def build_recorded_event(:account_projector, opts) do
