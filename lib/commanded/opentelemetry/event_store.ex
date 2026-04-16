@@ -208,8 +208,20 @@ defmodule Commanded.OpenTelemetry.EventStore do
     {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
     adapter_meta
   rescue
-    MatchError -> nil
-    RuntimeError -> nil
+    error in [MatchError, RuntimeError] ->
+      :telemetry.execute(
+        [:commanded, :opentelemetry, :warning],
+        %{count: 1},
+        %{
+          message:
+            "Failed to resolve event store adapter metadata, leaving event store destination unset",
+          application: application,
+          error: error,
+          tracer_id: @tracer_id
+        }
+      )
+
+      nil
   end
 
   defp event_store_name(adapter_meta) when is_map(adapter_meta),

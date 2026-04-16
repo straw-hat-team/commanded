@@ -350,6 +350,27 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
   end
 
   describe "defensive destination lookup" do
+    test "emits a telemetry warning when application lookup fails" do
+      warning_handler = attach_warning_handler()
+      on_exit(fn -> :telemetry.detach(warning_handler) end)
+
+      stream_uuid = UUID.uuid4()
+      application = MissingApplication
+
+      assert_raise RuntimeError, fn ->
+        EventStore.append_to_stream(application, stream_uuid, 0, [%EventData{}])
+      end
+
+      assert_receive {:warning, [:commanded, :opentelemetry, :warning], %{count: 1},
+                      %{
+                        message:
+                          "Failed to resolve event store adapter metadata, leaving event store destination unset",
+                        application: ^application,
+                        error: %RuntimeError{},
+                        tracer_id: OTelEventStore
+                      }}
+    end
+
     setup do
       start_supervised!(DefaultApp)
 
@@ -357,6 +378,9 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     end
 
     test "keeps the telemetry handler attached when event store config is nil" do
+      warning_handler = attach_warning_handler()
+      on_exit(fn -> :telemetry.detach(warning_handler) end)
+
       stream_uuid = UUID.uuid4()
 
       AppConfig.__put__(DefaultApp, :event_store, nil)
@@ -373,6 +397,15 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
              ) = assert_receive_span_named("append_to_stream")
 
       assert error_message =~ "(MatchError)"
+
+      assert_receive {:warning, [:commanded, :opentelemetry, :warning], %{count: 1},
+                      %{
+                        message:
+                          "Failed to resolve event store adapter metadata, leaving event store destination unset",
+                        application: DefaultApp,
+                        error: %MatchError{},
+                        tracer_id: OTelEventStore
+                      }}
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
@@ -496,5 +529,23 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
         end
       end
     end
+  end
+
+  defp attach_warning_handler do
+    handler_id = {__MODULE__, :warning, make_ref()}
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        [:commanded, :opentelemetry, :warning],
+        &__MODULE__.handle_warning/4,
+        self()
+      )
+
+    handler_id
+  end
+
+  def handle_warning(event, measurements, meta, pid) do
+    send(pid, {:warning, event, measurements, meta})
   end
 end
