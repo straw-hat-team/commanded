@@ -1,6 +1,7 @@
 defmodule Commanded.OpenTelemetry.EventStore do
   @moduledoc false
 
+  alias Commanded.Application, as: CommandedApplication
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
   alias OpenTelemetry.SemConv.ErrorAttributes
@@ -49,6 +50,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
       ) do
     operation_type = operation_type_for(action)
     action_name = to_string(action)
+    destination_name = event_store_destination_name(meta)
     source_uuid = extract_source_uuid(meta)
 
     attributes =
@@ -59,18 +61,15 @@ defmodule Commanded.OpenTelemetry.EventStore do
         {CommandedAttributes.commanded_application(), meta[:application]}
       ]
       |> maybe_add_operation_type(operation_type)
+      |> maybe_add_destination_name(destination_name)
       |> maybe_add_stream_uuid(meta[:stream_uuid])
       |> maybe_add_expected_version(meta[:expected_version])
       |> maybe_add_subscription_name(meta[:subscription_name])
       |> maybe_add_source_uuid(source_uuid)
       |> maybe_add_start_from(meta[:start_from])
 
-    # Use application as destination to maintain consistency with other Commanded modules
-    # and provide useful grouping in multi-application deployments.
-    application_name = Helpers.module_name(meta[:application])
-
     span_name =
-      case application_name do
+      case destination_name || Helpers.module_name(meta[:application]) do
         nil -> action_name
         name -> "#{action_name} #{name}"
       end
@@ -153,6 +152,11 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp maybe_add_operation_type(attrs, type),
     do: [{MessagingAttributes.messaging_operation_type(), type} | attrs]
 
+  defp maybe_add_destination_name(attrs, nil), do: attrs
+
+  defp maybe_add_destination_name(attrs, destination_name),
+    do: [{MessagingAttributes.messaging_destination_name(), destination_name} | attrs]
+
   defp maybe_add_stream_uuid(attrs, nil), do: attrs
 
   defp maybe_add_stream_uuid(attrs, stream_uuid),
@@ -187,6 +191,38 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp extract_source_uuid(%{source_uuid: uuid}) when is_binary(uuid), do: uuid
   defp extract_source_uuid(%{snapshot: %{source_uuid: uuid}}) when is_binary(uuid), do: uuid
   defp extract_source_uuid(_), do: nil
+
+  defp event_store_destination_name(meta) do
+    case to_destination_name(meta[:event_store_name]) do
+      nil ->
+        meta[:application]
+        |> lookup_event_store_name()
+        |> to_destination_name()
+
+      destination_name ->
+        destination_name
+    end
+  end
+
+  defp lookup_event_store_name(nil), do: nil
+
+  defp lookup_event_store_name(application) do
+    case CommandedApplication.event_store_adapter(application) do
+      {_adapter, adapter_meta} when is_map(adapter_meta) ->
+        Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
+
+      _other ->
+        nil
+    end
+  rescue
+    ArgumentError -> nil
+    RuntimeError -> nil
+  end
+
+  defp to_destination_name(nil), do: nil
+  defp to_destination_name(name) when is_binary(name), do: name
+  defp to_destination_name(name) when is_atom(name), do: inspect(name)
+  defp to_destination_name(_), do: nil
 
   defp to_start_from_attr(nil), do: nil
   defp to_start_from_attr(atom) when is_atom(atom), do: to_string(atom)
