@@ -198,8 +198,6 @@ defmodule Commanded.OpenTelemetry.EventStore do
     |> to_destination_name()
   end
 
-  defp lookup_event_store_name(nil), do: nil
-
   defp lookup_event_store_name(application) do
     application
     |> fetch_event_store_adapter_meta()
@@ -210,7 +208,6 @@ defmodule Commanded.OpenTelemetry.EventStore do
     {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
     adapter_meta
   rescue
-    ArgumentError -> nil
     MatchError -> nil
     RuntimeError -> nil
   end
