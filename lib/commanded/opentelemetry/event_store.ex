@@ -208,7 +208,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
     {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
     adapter_meta
   rescue
-    error in [MatchError, RuntimeError] ->
+    error ->
       :telemetry.execute(
         [:commanded, :opentelemetry, :warning],
         %{count: 1},

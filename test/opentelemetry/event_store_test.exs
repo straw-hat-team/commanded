@@ -371,6 +371,27 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                       }}
     end
 
+    test "emits a telemetry warning when application input is malformed" do
+      warning_handler = attach_warning_handler()
+      on_exit(fn -> :telemetry.detach(warning_handler) end)
+
+      stream_uuid = UUID.uuid4()
+      application = "not-an-application"
+
+      assert_raise FunctionClauseError, fn ->
+        EventStore.append_to_stream(application, stream_uuid, 0, [%EventData{}])
+      end
+
+      assert_receive {:warning, [:commanded, :opentelemetry, :warning], %{count: 1},
+                      %{
+                        message:
+                          "Failed to resolve event store adapter metadata, leaving event store destination unset",
+                        application: ^application,
+                        error: %FunctionClauseError{},
+                        tracer_id: OTelEventStore
+                      }}
+    end
+
     setup do
       start_supervised!(DefaultApp)
 
