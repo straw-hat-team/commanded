@@ -193,11 +193,9 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp extract_source_uuid(_), do: nil
 
   defp event_store_destination_name(meta) do
-    to_destination_name(meta[:event_store_name]) ||
-      meta[:application]
-      |> lookup_event_store_name()
-      |> to_destination_name() ||
-      Helpers.module_name(meta[:application])
+    meta[:application]
+    |> lookup_event_store_name()
+    |> to_destination_name()
   end
 
   defp lookup_event_store_name(nil), do: nil
