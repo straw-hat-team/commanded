@@ -10,7 +10,7 @@ defmodule Commanded.OpenTelemetry.Application do
 
   @tracer_id __MODULE__
 
-  def setup do
+  def setup(config \\ []) do
     :ok =
       :telemetry.attach_many(
         {__MODULE__, :dispatch},
@@ -20,7 +20,7 @@ defmodule Commanded.OpenTelemetry.Application do
           [:commanded, :application, :dispatch, :exception]
         ],
         &__MODULE__.handle_telemetry_event/4,
-        %{}
+        config
       )
   end
 
@@ -69,10 +69,11 @@ defmodule Commanded.OpenTelemetry.Application do
 
   def handle_telemetry_event(
         [:commanded, :application, :dispatch, :stop],
-        _measurements,
+        measurements,
         meta,
-        _config
+        config
       ) do
+    event_name = [:commanded, :application, :dispatch, :stop]
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
 
     if error = meta[:error] do
@@ -82,7 +83,7 @@ defmodule Commanded.OpenTelemetry.Application do
         Helpers.to_error_type(error, @tracer_id)
       )
 
-      Span.set_status(ctx, OpenTelemetry.status(:error, Helpers.format_error(error)))
+      Helpers.set_error_status(ctx, error, event_name, measurements, meta, config, @tracer_id)
     end
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)

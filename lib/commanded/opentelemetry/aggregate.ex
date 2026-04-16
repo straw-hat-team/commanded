@@ -10,7 +10,7 @@ defmodule Commanded.OpenTelemetry.Aggregate do
 
   @tracer_id __MODULE__
 
-  def setup do
+  def setup(config \\ []) do
     :ok =
       :telemetry.attach_many(
         {__MODULE__, :execute},
@@ -20,7 +20,7 @@ defmodule Commanded.OpenTelemetry.Aggregate do
           [:commanded, :aggregate, :execute, :exception]
         ],
         &__MODULE__.handle_telemetry_event/4,
-        %{}
+        config
       )
   end
 
@@ -79,10 +79,11 @@ defmodule Commanded.OpenTelemetry.Aggregate do
 
   def handle_telemetry_event(
         [:commanded, :aggregate, :execute, :stop],
-        _measurements,
+        measurements,
         meta,
-        _config
+        config
       ) do
+    event_name = [:commanded, :aggregate, :execute, :stop]
     ctx = OpentelemetryTelemetry.set_current_telemetry_span(@tracer_id, meta)
 
     events = Map.get(meta, :events, [])
@@ -95,7 +96,7 @@ defmodule Commanded.OpenTelemetry.Aggregate do
         Helpers.to_error_type(error, @tracer_id)
       )
 
-      Span.set_status(ctx, OpenTelemetry.status(:error, Helpers.format_error(error)))
+      Helpers.set_error_status(ctx, error, event_name, measurements, meta, config, @tracer_id)
     end
 
     wrong_expected_version_count = Map.get(meta, :wrong_expected_version_count, 0)

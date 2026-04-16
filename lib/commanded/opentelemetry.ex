@@ -55,9 +55,36 @@ defmodule Commanded.OpenTelemetry do
   """
   @type span_relationship :: :link | :child | :none
 
+  @typedoc """
+  Callback used to decide the OpenTelemetry span status for returned `:stop` errors.
+
+  The callback is only invoked when Commanded emits stop metadata containing `:error`.
+  Exception telemetry continues to use OpenTelemetry exception semantics directly.
+  """
+  @type error_status_callback ::
+          (event_name :: [atom()],
+           measurements :: map(),
+           metadata :: map(),
+           config :: keyword() ->
+             OpenTelemetry.status_code() | nil)
+
+  @error_status_options [
+    error_status: [
+      type: {:fun, 4},
+      type_doc: "`t:error_status_callback/0`",
+      doc:
+        "Override the span status for returned `:stop` errors. Return `nil` to leave the status unset."
+    ]
+  ]
+
   @nimble_schema NimbleOptions.new!(
                    aggregate: [
-                     type: {:in, [:disabled, []]},
+                     type:
+                       {:or,
+                        [
+                          {:in, [:disabled]},
+                          keyword_list: @error_status_options
+                        ]},
                      default: [],
                      doc: "Aggregate tracing configuration. Use `:disabled` to disable."
                    ],
@@ -72,7 +99,12 @@ defmodule Commanded.OpenTelemetry do
                      doc: "Aggregate snapshot tracing configuration. Use `:disabled` to disable."
                    ],
                    application: [
-                     type: {:in, [:disabled, []]},
+                     type:
+                       {:or,
+                        [
+                          {:in, [:disabled]},
+                          keyword_list: @error_status_options
+                        ]},
                      default: [],
                      doc:
                        "Application dispatch tracing configuration. Use `:disabled` to disable."
@@ -123,6 +155,16 @@ defmodule Commanded.OpenTelemetry do
       # Disable event handler tracing
       Commanded.OpenTelemetry.setup(event_handler: :disabled)
 
+      # Leave returned domain errors unset for dispatch spans
+      Commanded.OpenTelemetry.setup(
+        application: [
+          error_status: fn
+            _event_name, _measurements, %{error: :validation_failed}, _config -> :unset
+            _event_name, _measurements, _meta, _config -> :error
+          end
+        ]
+      )
+
       # Disable aggregate populate tracing
       Commanded.OpenTelemetry.setup(aggregate_populate: :disabled)
 
@@ -142,7 +184,7 @@ defmodule Commanded.OpenTelemetry do
 
     case opts[:aggregate] do
       :disabled -> :ok
-      _config -> Aggregate.setup()
+      config -> Aggregate.setup(config)
     end
 
     case opts[:aggregate_populate] do
@@ -157,7 +199,7 @@ defmodule Commanded.OpenTelemetry do
 
     case opts[:application] do
       :disabled -> :ok
-      _config -> OTelApplication.setup()
+      config -> OTelApplication.setup(config)
     end
 
     case opts[:event_handler] do

@@ -61,3 +61,37 @@ Note: `setup/1` should only be called once during application startup.
 Commanded.OpenTelemetry.setup(event_handler: :disabled)
 ```
 
+## Override Returned Error Status
+
+You can override the span status used for returned `:stop` errors on application
+dispatch and aggregate execution spans:
+
+```elixir
+Commanded.OpenTelemetry.setup(
+  application: [
+    error_status: fn
+      _event_name, _measurements, %{error: :validation_failed}, _config -> :unset
+      _event_name, _measurements, _meta, _config -> :error
+    end
+  ],
+  aggregate: [
+    error_status: fn
+      _event_name, _measurements, %{error: :validation_failed}, _config -> :unset
+      _event_name, _measurements, _meta, _config -> :error
+    end
+  ]
+)
+```
+
+The callback receives the telemetry event name first, then the stop measurements,
+then the full telemetry metadata map, and finally the instrumentation config. It
+may return:
+
+- `:unset`, `:ok`, or `:error`
+- `nil` to leave the status unset
+
+When the callback returns `:error`, Commanded derives the status description from
+the returned error using `Commanded.OpenTelemetry.Helpers.format_error/1`.
+
+Exceptions are not routed through this callback; they continue to record
+exception events and set span status to error.
