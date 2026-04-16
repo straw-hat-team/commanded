@@ -481,6 +481,141 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     end
   end
 
+  describe "synthetic coverage for internal branches" do
+    setup do
+      start_supervised!(DefaultApp)
+
+      [destination_name: expected_event_store_destination(DefaultApp)]
+    end
+
+    test "stop events set error status when metadata includes error", %{
+      destination_name: destination_name
+    } do
+      stream_uuid = UUID.uuid4()
+      span_name = expected_span_name("append_to_stream", destination_name)
+
+      meta =
+        build_event_store_append_to_stream_metadata(
+          application: DefaultApp,
+          stream_uuid: stream_uuid,
+          expected_version: 0
+        )
+
+      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :event_store, :append_to_stream, :stop],
+        %{duration: 1000},
+        Map.put(meta, :error, :stream_not_found)
+      )
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message == ":stream_not_found"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "messaging.destination.name": destination_name,
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "error.type": "stream_not_found"
+             }
+    end
+
+    test "exception events keep exception type and message attributes", %{
+      destination_name: destination_name
+    } do
+      stream_uuid = UUID.uuid4()
+      span_name = expected_span_name("append_to_stream", destination_name)
+
+      meta =
+        build_event_store_append_to_stream_metadata(
+          application: DefaultApp,
+          stream_uuid: stream_uuid,
+          expected_version: 0
+        )
+
+      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :event_store, :append_to_stream, :exception],
+        %{duration: 100},
+        Map.merge(meta, %{
+          kind: :error,
+          reason: %RuntimeError{message: "failed"},
+          stacktrace: []
+        })
+      )
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes,
+               events: events
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message == "** (RuntimeError) failed"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "messaging.destination.name": destination_name,
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.RuntimeError"
+             }
+
+      assert_exception_event(events, "Elixir.RuntimeError", "failed")
+    end
+  end
+
+  describe "exception spans" do
+    test "unstarted applications emit exception spans without detaching the handler" do
+      stream_uuid = UUID.uuid4()
+      span_name = expected_span_name("append_to_stream", nil)
+
+      assert_raise RuntimeError, fn ->
+        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      end
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes,
+               events: events
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message =~ "could not lookup #{inspect(DefaultApp)}"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.RuntimeError"
+             }
+
+      assert_exception_event(events, "Elixir.RuntimeError")
+      assert_handler_attached(:append_to_stream)
+    end
+  end
+
   defp expected_event_store_destination(application) do
     {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
     destination_name = Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
@@ -492,6 +627,9 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
   defp to_expected_destination_name(name) when is_binary(name), do: name
   defp to_expected_destination_name(name) when is_atom(name), do: inspect(name)
   defp to_expected_destination_name(_), do: nil
+
+  defp expected_span_name(action_name, nil), do: action_name
+  defp expected_span_name(action_name, destination_name), do: "#{action_name} #{destination_name}"
 
   defp build_snapshot(source_uuid) do
     %SnapshotData{
@@ -529,7 +667,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     end
   end
 
-  defp assert_exception_event(events, exception_type) do
+  defp assert_exception_event(events, exception_type, exception_message \\ nil) do
     events_list = :otel_events.list(events)
     exception_event = Enum.find(events_list, &(elem(&1, 2) == :exception))
 
@@ -539,6 +677,10 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     {:attributes, _, _, _, attrs_map} = attrs_tuple
 
     assert attrs_map[:"exception.type"] == exception_type
+
+    if exception_message do
+      assert attrs_map[:"exception.message"] == exception_message
+    end
   end
 
   defp assert_handler_attached(event) do
