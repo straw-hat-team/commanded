@@ -2,13 +2,8 @@ defmodule Commanded.EventStore.EventStorePrefixTestCase do
   import Commanded.SharedTestCase
 
   define_tests do
-    alias Commanded.EventStore.EventData
+    alias Commanded.EventStore.AdapterTestData
     alias Commanded.UUID
-
-    defmodule BankAccountOpened do
-      @derive Jason.Encoder
-      defstruct [:account_number, :initial_balance]
-    end
 
     describe "event store prefix" do
       setup do
@@ -35,18 +30,10 @@ defmodule Commanded.EventStore.EventStorePrefixTestCase do
     defp build_events(count, correlation_id \\ UUID.uuid4(), causation_id \\ UUID.uuid4())
 
     defp build_events(count, correlation_id, causation_id) do
-      for account_number <- 1..count,
-          do: build_event(account_number, correlation_id, causation_id)
-    end
-
-    defp build_event(account_number, correlation_id, causation_id) do
-      %EventData{
+      AdapterTestData.build_opened_events(count,
         correlation_id: correlation_id,
-        causation_id: causation_id,
-        event_type: "#{__MODULE__}.BankAccountOpened",
-        data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-        metadata: %{"metadata" => "value"}
-      }
+        causation_id: causation_id
+      )
     end
   end
 end

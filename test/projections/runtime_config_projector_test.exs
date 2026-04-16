@@ -1,10 +1,9 @@
 defmodule Commanded.Projections.RuntimeConfigProjectorTest do
   use Commanded.MockProjectionCase
 
-  alias Commanded.EventStore.RecordedEvent
   alias Commanded.Projections.Events.AnEvent
   alias Commanded.Projections.{Projection, ProjectionAssertions, Repo, RuntimeConfigProjector}
-  alias Commanded.UUID
+  alias Commanded.TestSupport.Factory
   alias Ecto.Adapters.SQL.Sandbox
 
   import ProjectionAssertions
@@ -29,12 +28,11 @@ defmodule Commanded.Projections.RuntimeConfigProjectorTest do
 
     test "should handle a projected event", %{projector1: projector1} do
       send_events(projector1, [
-        %RecordedEvent{
-          event_number: 1,
-          event_id: UUID.uuid4(),
+        Factory.build_recorded_event(
           data: %AnEvent{pid: self()},
-          metadata: %{}
-        }
+          event_number: 1,
+          stream_version: 1
+        )
       ])
 
       assert_receive {:project, "AnEvent"}

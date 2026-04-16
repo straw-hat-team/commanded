@@ -3,8 +3,8 @@ defmodule Commanded.Aggregates.AggregateLifespanTest do
 
   alias Commanded.Aggregates.{Aggregate, DefaultLifespanRouter, LifespanAggregate, LifespanRouter}
   alias Commanded.Aggregates.LifespanAggregate.{Command, Event}
+  alias Commanded.TestSupport.Factory
   alias Commanded.{DefaultApp, EventStore}
-  alias Commanded.EventStore.RecordedEvent
   alias Commanded.{Registration, UUID}
 
   describe "aggregate lifespan" do
@@ -375,11 +375,11 @@ defmodule Commanded.Aggregates.AggregateLifespanTest do
       ref: ref
     } do
       events = [
-        %RecordedEvent{
-          event_id: UUID.uuid4(),
-          stream_version: 1,
-          data: %Event{uuid: aggregate_uuid}
-        }
+        Factory.build_recorded_event(
+          data: %Event{uuid: aggregate_uuid},
+          event_number: 1,
+          stream_version: 1
+        )
       ]
 
       # Simulate sending an event directly to the aggregate process

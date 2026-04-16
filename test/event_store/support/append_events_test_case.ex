@@ -4,13 +4,8 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
   define_tests do
     import Commanded.Enumerable, only: [pluck: 2]
 
-    alias Commanded.EventStore.EventData
+    alias Commanded.EventStore.AdapterTestData
     alias Commanded.UUID
-
-    defmodule BankAccountOpened do
-      @derive Jason.Encoder
-      defstruct [:account_number, :initial_balance]
-    end
 
     describe "event store adapter" do
       test "should implement `Commanded.EventStore.Adapter` behaviour", %{
@@ -147,6 +142,35 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
 
         assert :ok == event_store.append_to_stream(event_store_meta, "stream", 3, build_events(1))
       end
+
+      test "should preserve explicit event ids and reject duplicates across streams", %{
+        event_store: event_store,
+        event_store_meta: event_store_meta
+      } do
+        transfer_uuid = UUID.uuid4()
+
+        assert :ok ==
+                 event_store.append_to_stream(
+                   event_store_meta,
+                   "stream-1",
+                   0,
+                   [build_deposit_event(101, transfer_uuid: transfer_uuid)]
+                 )
+
+        [recorded_event] =
+          event_store.stream_forward(event_store_meta, "stream-1") |> Enum.to_list()
+
+        assert recorded_event.event_id == transfer_uuid
+        assert recorded_event.data.transfer_uuid == transfer_uuid
+
+        assert {:error, :duplicate_event} ==
+                 event_store.append_to_stream(
+                   event_store_meta,
+                   "stream-2",
+                   0,
+                   [build_deposit_event(202, transfer_uuid: transfer_uuid)]
+                 )
+      end
     end
 
     describe "stream events from an unknown stream" do
@@ -177,7 +201,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
           assert event.stream_id == "stream"
           assert event.correlation_id == correlation_id
           assert event.causation_id == causation_id
-          assert event.metadata == %{"metadata" => "value"}
+          assert event.metadata == AdapterTestData.default_metadata()
           assert %DateTime{} = event.created_at
         end)
 
@@ -225,21 +249,17 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
       end
     end
 
-    defp build_event(account_number, correlation_id, causation_id) do
-      %EventData{
-        correlation_id: correlation_id,
-        causation_id: causation_id,
-        event_type: "#{__MODULE__}.BankAccountOpened",
-        data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-        metadata: %{"metadata" => "value"}
-      }
-    end
-
     defp build_events(count, correlation_id \\ UUID.uuid4(), causation_id \\ UUID.uuid4())
 
     defp build_events(count, correlation_id, causation_id) do
-      for account_number <- 1..count,
-          do: build_event(account_number, correlation_id, causation_id)
+      AdapterTestData.build_opened_events(count,
+        correlation_id: correlation_id,
+        causation_id: causation_id
+      )
+    end
+
+    defp build_deposit_event(account_number, opts) do
+      AdapterTestData.build_deposit_event(account_number, opts)
     end
 
     defp assert_is_uuid(uuid) do
@@ -259,6 +279,7 @@ defmodule Commanded.EventStore.AppendEventsTestCase do
         &%{
           causation_id: &1.causation_id,
           correlation_id: &1.correlation_id,
+          event_type: &1.event_type,
           data: &1.data,
           metadata: &1.metadata
         }

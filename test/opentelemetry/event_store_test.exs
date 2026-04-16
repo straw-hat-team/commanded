@@ -13,7 +13,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
   alias Commanded.Application.Config, as: AppConfig
   alias Commanded.DefaultApp
   alias Commanded.EventStore
-  alias Commanded.EventStore.{EventData, SnapshotData}
+  alias Commanded.EventStore.{AdapterTestData, SnapshotData}
   alias Commanded.OpenTelemetry.EventStore, as: OTelEventStore
   alias Commanded.UUID
 
@@ -82,7 +82,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     } do
       stream_uuid = UUID.uuid4()
 
-      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
 
       assert span(kind: :internal, attributes: attributes) =
                assert_receive_span_named("append_to_stream #{destination_name}")
@@ -104,7 +104,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     } do
       stream_uuid = UUID.uuid4()
 
-      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
       _ = assert_receive_span_named("append_to_stream #{destination_name}")
 
       assert [_event] = EventStore.stream_forward(DefaultApp, stream_uuid, 0)
@@ -162,7 +162,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       assert_receive {:subscribed, ^subscription}, 1000
       _ = assert_receive_span_named("subscribe_to #{destination_name}")
 
-      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
       assert_receive {:events, [event]}, 1000
       _ = assert_receive_span_named("append_to_stream #{destination_name}")
 
@@ -358,7 +358,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       application = MissingApplication
 
       assert_raise RuntimeError, fn ->
-        EventStore.append_to_stream(application, stream_uuid, 0, [%EventData{}])
+        EventStore.append_to_stream(application, stream_uuid, 0, build_events(1))
       end
 
       assert_receive {:warning, [:commanded, :opentelemetry, :warning], %{count: 1},
@@ -379,7 +379,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       application = "not-an-application"
 
       assert_raise FunctionClauseError, fn ->
-        EventStore.append_to_stream(application, stream_uuid, 0, [%EventData{}])
+        EventStore.append_to_stream(application, stream_uuid, 0, build_events(1))
       end
 
       assert_receive {:warning, [:commanded, :opentelemetry, :warning], %{count: 1},
@@ -407,7 +407,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       AppConfig.__put__(DefaultApp, :event_store, nil)
 
       assert_raise MatchError, fn ->
-        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
       end
 
       assert span(
@@ -454,7 +454,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       )
 
       assert_raise FunctionClauseError, fn ->
-        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
       end
 
       assert span(
@@ -587,7 +587,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       span_name = expected_span_name("append_to_stream", nil)
 
       assert_raise RuntimeError, fn ->
-        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
       end
 
       assert span(
@@ -632,15 +632,10 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
   defp expected_span_name(action_name, destination_name), do: "#{action_name} #{destination_name}"
 
   defp build_snapshot(source_uuid) do
-    %SnapshotData{
-      source_uuid: source_uuid,
-      source_version: 5,
-      source_type: "Elixir.Commanded.TestSupport.TestDomain.Account",
-      data: build_account(account_id: source_uuid),
-      metadata: %{},
-      created_at: DateTime.utc_now()
-    }
+    AdapterTestData.build_snapshot_data(5, source_uuid: source_uuid, metadata: %{})
   end
+
+  defp build_events(count), do: AdapterTestData.build_opened_events(count)
 
   defp unique_subscription_name do
     "subscription-#{System.unique_integer([:positive])}"

@@ -2,13 +2,7 @@ defmodule Commanded.EventStore.SnapshotTestCase do
   import Commanded.SharedTestCase
 
   define_tests do
-    alias Commanded.EventStore.SnapshotData
-    alias Commanded.UUID
-
-    defmodule BankAccountOpened do
-      @derive Jason.Encoder
-      defstruct [:account_number, :initial_balance]
-    end
+    alias Commanded.EventStore.AdapterTestData
 
     describe "record a snapshot" do
       test "should record the snapshot", %{
@@ -36,7 +30,34 @@ defmodule Commanded.EventStore.SnapshotTestCase do
 
         {:ok, snapshot} = event_store.read_snapshot(event_store_meta, snapshot3.source_uuid)
 
+        assert snapshot.source_uuid == snapshot3.source_uuid
+        assert snapshot.source_version == snapshot3.source_version
+        assert snapshot.source_type == snapshot3.source_type
+        assert snapshot.metadata == snapshot3.metadata
+        assert snapshot.data.__struct__ == snapshot3.data.__struct__
+        assert snapshot.data.account_number == snapshot3.data.account_number
+        assert snapshot.data.balance == snapshot3.data.balance
+        assert snapshot.data.state == to_string(snapshot3.data.state)
         assert snapshot_timestamps_within_delta?(snapshot, snapshot3, 60)
+      end
+
+      test "should preserve snapshot metadata", %{
+        event_store: event_store,
+        event_store_meta: event_store_meta
+      } do
+        metadata = %{
+          "request" => %{"actor_id" => "customer-123", "roles" => ["admin", "support"]},
+          "trace_id" => "trace-123"
+        }
+
+        snapshot = build_snapshot_data(100, metadata: metadata)
+
+        assert :ok == event_store.record_snapshot(event_store_meta, snapshot)
+
+        assert {:ok, read_snapshot} =
+                 event_store.read_snapshot(event_store_meta, snapshot.source_uuid)
+
+        assert read_snapshot.metadata == metadata
       end
 
       test "should error when snapshot does not exist", %{
@@ -66,16 +87,8 @@ defmodule Commanded.EventStore.SnapshotTestCase do
       end
     end
 
-    defp build_snapshot_data(account_number) do
-      %SnapshotData{
-        source_uuid: UUID.uuid4(),
-        source_version: account_number,
-        source_type: "#{__MODULE__}.BankAccountOpened",
-        data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-        metadata: nil,
-        created_at: DateTime.utc_now()
-      }
-    end
+    defp build_snapshot_data(account_number, opts \\ []),
+      do: AdapterTestData.build_snapshot_data(account_number, opts)
 
     defp snapshot_timestamps_within_delta?(snapshot, other_snapshot, delta_seconds) do
       DateTime.diff(snapshot.created_at, other_snapshot.created_at, :second) < delta_seconds

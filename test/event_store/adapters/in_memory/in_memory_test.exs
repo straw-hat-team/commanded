@@ -1,14 +1,8 @@
 defmodule Commanded.EventStore.Adapters.InMemoryTest do
   use Commanded.EventStore.InMemoryTestCase
 
+  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.Adapters.InMemory
-  alias Commanded.EventStore.EventData
-  alias Commanded.UUID
-
-  defmodule BankAccountOpened do
-    @derive Jason.Encoder
-    defstruct [:account_number, :initial_balance]
-  end
 
   describe "reset!/0" do
     test "wipes all data from memory", %{event_store_meta: event_store_meta} do
@@ -45,17 +39,11 @@ defmodule Commanded.EventStore.Adapters.InMemoryTest do
     end
   end
 
-  defp build_event(account_number) do
-    %EventData{
-      causation_id: UUID.uuid4(),
-      correlation_id: UUID.uuid4(),
-      event_type: "#{__MODULE__}.BankAccountOpened",
-      data: %BankAccountOpened{account_number: account_number, initial_balance: 1_000},
-      metadata: %{"user_id" => "test"}
-    }
-  end
+  defp build_event(account_number),
+    do:
+      AdapterTestData.build_opened_events(1, start_account_number: account_number) |> List.first()
 
   defp build_events(count) do
-    for account_number <- 1..count, do: build_event(account_number)
+    AdapterTestData.build_opened_events(count)
   end
 end
