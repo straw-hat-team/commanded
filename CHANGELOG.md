@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.6.0](https://github.com/straw-hat-team/commanded/compare/v3.5.0...v3.6.0) (2026-04-16)
+
+
+### Features
+
+* **telemetry:** Add registry adapter to aggregate execute span ([#71](https://github.com/straw-hat-team/commanded/issues/71)) ([fdaaa5d](https://github.com/straw-hat-team/commanded/commit/fdaaa5d0b4d373f6a01efd1349fe6156162c76b0))
+* **telemetry:** Keep returned command errors out of failed spans ([#82](https://github.com/straw-hat-team/commanded/issues/82)) ([f586f58](https://github.com/straw-hat-team/commanded/commit/f586f58d8ba284081a0ff9b4e7ae629d7518134f))
+
+
+### Bug Fixes
+
+* **dispatch:** Reduce drift in the public return contract ([#74](https://github.com/straw-hat-team/commanded/issues/74)) ([0813343](https://github.com/straw-hat-team/commanded/commit/0813343e3460649744d4876ca6b7b7c60088405d))
+* **dispatch:** Reject invalid command UUID overrides ([#75](https://github.com/straw-hat-team/commanded/issues/75)) ([195a12b](https://github.com/straw-hat-team/commanded/commit/195a12ba90029250d39e4af88ba57fdf094859bc))
+* **subscriptions:** Avoid races in teardown assertions ([#80](https://github.com/straw-hat-team/commanded/issues/80)) ([91a612f](https://github.com/straw-hat-team/commanded/commit/91a612ff7fee4cb42f9fe0618b4baf853d269e27))
+* **telemetry:** Isolate test OpenTelemetry configuration ([#79](https://github.com/straw-hat-team/commanded/issues/79)) ([2b0a739](https://github.com/straw-hat-team/commanded/commit/2b0a739680f04823b70de7b28843d3441f97ac4d))
+* **test:** Keep projection setup out of unrelated runs ([#81](https://github.com/straw-hat-team/commanded/issues/81)) ([ea80428](https://github.com/straw-hat-team/commanded/commit/ea804280f5d54a930ac4302460dc6aea06649c4f))
+* **types:** Align execution result metadata with dispatch contract ([#77](https://github.com/straw-hat-team/commanded/issues/77)) ([2ebcd07](https://github.com/straw-hat-team/commanded/commit/2ebcd07d42fd17132347ec98beac4e1e21ce86da))
+* **types:** Keep failure context strict ([#78](https://github.com/straw-hat-team/commanded/issues/78)) ([47db0d2](https://github.com/straw-hat-team/commanded/commit/47db0d20e290e084323e4daeb63939c584a25916))
+* **types:** Prevent invalid dispatch metadata from bypassing Dialyzer ([#73](https://github.com/straw-hat-team/commanded/issues/73)) ([495f886](https://github.com/straw-hat-team/commanded/commit/495f886a1619e3b2ae5d763554553693abf118ab))
+* **types:** Strengthen dispatch struct contracts for Dialyzer ([#76](https://github.com/straw-hat-team/commanded/issues/76)) ([c677d4c](https://github.com/straw-hat-team/commanded/commit/c677d4c6d9b9f9a0873121631893d7ce5db963f7))
+
 ## [3.5.0](https://github.com/straw-hat-team/commanded/compare/v3.4.1...v3.5.0) (2026-04-05)
 
 
