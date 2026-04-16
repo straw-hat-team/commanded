@@ -9,6 +9,9 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
   import Commanded.TestSupport.Factory
 
+  alias Commanded.DefaultApp
+  alias Commanded.EventStore
+  alias Commanded.EventStore.{EventData, SnapshotData}
   alias Commanded.OpenTelemetry.EventStore, as: OTelEventStore
   alias Commanded.UUID
 
@@ -65,518 +68,456 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
     end
   end
 
-  describe "append_to_stream spans" do
+  describe "runtime spans" do
     setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
+      start_supervised!(DefaultApp)
+
+      [application_name: inspect(DefaultApp)]
     end
 
-    test "creates span with correct attributes" do
+    test "append_to_stream uses the started application in the span name", %{
+      application_name: application_name
+    } do
       stream_uuid = UUID.uuid4()
 
-      meta =
-        build_event_store_append_to_stream_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid,
-          expected_version: 0
-        )
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
 
-      :telemetry.span([:commanded, :event_store, :append_to_stream], meta, fn ->
-        {:ok, meta}
-      end)
-
-      assert_receive {:span,
-                      span(
-                        name: "append_to_stream TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("append_to_stream #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :publish,
                "messaging.operation.name": "append_to_stream",
                "code.function": "append_to_stream",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.stream.uuid": stream_uuid,
                "commanded.expected_version": 0
              }
     end
-  end
 
-  describe "stream_forward spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "creates span with correct attributes" do
+    test "stream_forward uses the started application in the span name", %{
+      application_name: application_name
+    } do
       stream_uuid = UUID.uuid4()
 
-      meta =
-        build_event_store_stream_forward_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid,
-          start_version: 0,
-          read_batch_size: 1000
-        )
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      _ = assert_receive_span_named("append_to_stream #{application_name}")
 
-      :telemetry.span([:commanded, :event_store, :stream_forward], meta, fn ->
-        {:ok, meta}
-      end)
+      assert [_event] = EventStore.stream_forward(DefaultApp, stream_uuid, 0)
 
-      assert_receive {:span,
-                      span(
-                        name: "stream_forward TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("stream_forward #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "stream_forward",
                "code.function": "stream_forward",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.stream.uuid": stream_uuid
              }
     end
-  end
 
-  describe "subscribe_to spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
+    test "subscribe_to uses the started application in the span name", %{
+      application_name: application_name
+    } do
+      subscription_name = unique_subscription_name()
 
-    test "creates span with subscription attributes" do
-      meta =
-        build_event_store_subscribe_to_metadata(
-          application: TestApp,
-          stream_uuid: :all,
-          subscription_name: "TestSubscription",
-          subscriber: self(),
-          start_from: :origin
-        )
+      assert {:ok, subscription} =
+               EventStore.subscribe_to(DefaultApp, :all, subscription_name, self(), :origin)
 
-      :telemetry.span([:commanded, :event_store, :subscribe_to], meta, fn ->
-        {:ok, meta}
-      end)
+      assert_receive {:subscribed, ^subscription}, 1000
 
-      assert_receive {:span,
-                      span(
-                        name: "subscribe_to TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("subscribe_to #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "subscribe_to",
-               "messaging.destination.subscription.name": "TestSubscription",
+               "messaging.destination.subscription.name": subscription_name,
                "code.function": "subscribe_to",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.stream.uuid": :all,
-               "commanded.subscription.name": "TestSubscription",
+               "commanded.subscription.name": subscription_name,
                "commanded.start_from": "origin"
              }
     end
-  end
 
-  describe "ack_event spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
+    test "ack_event uses the started application in the span name", %{
+      application_name: application_name
+    } do
+      subscription_name = unique_subscription_name()
+      stream_uuid = UUID.uuid4()
 
-    test "creates span with settle operation type" do
-      meta =
-        build_event_store_ack_event_metadata(
-          application: TestApp,
-          subscription: self(),
-          event: %{}
-        )
+      assert {:ok, subscription} =
+               EventStore.subscribe_to(DefaultApp, :all, subscription_name, self(), :origin)
 
-      :telemetry.span([:commanded, :event_store, :ack_event], meta, fn ->
-        {:ok, meta}
-      end)
+      assert_receive {:subscribed, ^subscription}, 1000
+      _ = assert_receive_span_named("subscribe_to #{application_name}")
 
-      assert_receive {:span,
-                      span(
-                        name: "ack_event TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      assert_receive {:events, [event]}, 1000
+      _ = assert_receive_span_named("append_to_stream #{application_name}")
+
+      assert :ok = EventStore.ack_event(DefaultApp, subscription, event)
+
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("ack_event #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :settle,
                "messaging.operation.name": "ack_event",
                "code.function": "ack_event",
-               "commanded.application": TestApp
-             }
-    end
-  end
-
-  describe "error handling" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "sets error status when stop includes error" do
-      stream_uuid = UUID.uuid4()
-
-      meta =
-        build_event_store_append_to_stream_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid,
-          expected_version: 0
-        )
-
-      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
-
-      stop_meta = Map.put(meta, :error, :stream_not_found)
-
-      :telemetry.execute(
-        [:commanded, :event_store, :append_to_stream, :stop],
-        %{duration: 1000},
-        stop_meta
-      )
-
-      assert_receive {:span,
-                      span(
-                        name: "append_to_stream TestApp",
-                        status: {:status, :error, error_message},
-                        attributes: span_attrs
-                      )},
-                     1000
-
-      assert error_message == ":stream_not_found"
-
-      assert :otel_attributes.map(span_attrs) == %{
-               "messaging.system": "commanded",
-               "messaging.operation.type": :publish,
-               "messaging.operation.name": "append_to_stream",
-               "code.function": "append_to_stream",
-               "commanded.application": TestApp,
-               "commanded.stream.uuid": stream_uuid,
-               "commanded.expected_version": 0,
-               "error.type": "stream_not_found"
+               "commanded.application": DefaultApp
              }
     end
 
-    test "handles RuntimeError exception" do
-      stream_uuid = UUID.uuid4()
-
-      meta =
-        build_event_store_append_to_stream_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid,
-          expected_version: 0
-        )
-
-      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :error,
-          reason: %RuntimeError{message: "connection failed"},
-          stacktrace: []
-        })
-
-      :telemetry.execute(
-        [:commanded, :event_store, :append_to_stream, :exception],
-        %{duration: 100},
-        exception_meta
-      )
-
-      assert_receive {:span,
-                      span(
-                        name: "append_to_stream TestApp",
-                        status: {:status, :error, error_msg},
-                        attributes: span_attrs
-                      )},
-                     1000
-
-      assert error_msg == "** (RuntimeError) connection failed"
-
-      assert :otel_attributes.map(span_attrs) == %{
-               "messaging.system": "commanded",
-               "messaging.operation.type": :publish,
-               "messaging.operation.name": "append_to_stream",
-               "code.function": "append_to_stream",
-               "commanded.application": TestApp,
-               "commanded.stream.uuid": stream_uuid,
-               "commanded.expected_version": 0,
-               "erlang.exception.kind": :error,
-               "error.type": "Elixir.RuntimeError"
-             }
-    end
-
-    test "records exception event with proper attributes" do
-      stream_uuid = UUID.uuid4()
-
-      meta =
-        build_event_store_append_to_stream_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid,
-          expected_version: 0
-        )
-
-      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
-
-      exception_meta =
-        Map.merge(meta, %{
-          kind: :error,
-          reason: %RuntimeError{message: "failed"},
-          stacktrace: []
-        })
-
-      :telemetry.execute(
-        [:commanded, :event_store, :append_to_stream, :exception],
-        %{duration: 100},
-        exception_meta
-      )
-
-      assert_receive {:span,
-                      span(
-                        name: "append_to_stream TestApp",
-                        events: events
-                      )},
-                     1000
-
-      events_list = :otel_events.list(events)
-      exception_event = Enum.find(events_list, fn event -> elem(event, 2) == :exception end)
-      {:event, _timestamp, :exception, attrs_tuple} = exception_event
-      {:attributes, _, _, _, attrs_map} = attrs_tuple
-
-      assert attrs_map[:"exception.type"] == "Elixir.RuntimeError"
-      assert attrs_map[:"exception.message"] == "failed"
-    end
-  end
-
-  describe "record_snapshot spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "creates span with correct attributes including source_uuid" do
+    test "record_snapshot uses the started application in the span name", %{
+      application_name: application_name
+    } do
       source_uuid = UUID.uuid4()
+      snapshot = build_snapshot(source_uuid)
 
-      meta =
-        build_event_store_record_snapshot_metadata(
-          application: TestApp,
-          source_uuid: source_uuid
-        )
+      assert :ok = EventStore.record_snapshot(DefaultApp, snapshot)
 
-      :telemetry.span([:commanded, :event_store, :record_snapshot], meta, fn ->
-        {:ok, meta}
-      end)
-
-      assert_receive {:span,
-                      span(
-                        name: "record_snapshot TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("record_snapshot #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :publish,
                "messaging.operation.name": "record_snapshot",
                "code.function": "record_snapshot",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.source.uuid": source_uuid
              }
     end
-  end
 
-  describe "read_snapshot spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "creates span with correct attributes including source_uuid" do
+    test "read_snapshot uses the started application in the span name", %{
+      application_name: application_name
+    } do
       source_uuid = UUID.uuid4()
+      snapshot = build_snapshot(source_uuid)
 
-      meta =
-        build_event_store_read_snapshot_metadata(
-          application: TestApp,
-          source_uuid: source_uuid
-        )
+      assert :ok = EventStore.record_snapshot(DefaultApp, snapshot)
+      _ = assert_receive_span_named("record_snapshot #{application_name}")
 
-      :telemetry.span([:commanded, :event_store, :read_snapshot], meta, fn ->
-        {:ok, meta}
-      end)
+      assert {:ok, %SnapshotData{source_uuid: ^source_uuid}} =
+               EventStore.read_snapshot(DefaultApp, source_uuid)
 
-      assert_receive {:span,
-                      span(
-                        name: "read_snapshot TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("read_snapshot #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "read_snapshot",
                "code.function": "read_snapshot",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.source.uuid": source_uuid
              }
     end
-  end
 
-  describe "delete_snapshot spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "creates span with correct attributes including source_uuid" do
+    test "delete_snapshot uses the started application in the span name", %{
+      application_name: application_name
+    } do
       source_uuid = UUID.uuid4()
+      snapshot = build_snapshot(source_uuid)
 
-      meta =
-        build_event_store_delete_snapshot_metadata(
-          application: TestApp,
-          source_uuid: source_uuid
-        )
+      assert :ok = EventStore.record_snapshot(DefaultApp, snapshot)
+      _ = assert_receive_span_named("record_snapshot #{application_name}")
 
-      :telemetry.span([:commanded, :event_store, :delete_snapshot], meta, fn ->
-        {:ok, meta}
-      end)
+      assert :ok = EventStore.delete_snapshot(DefaultApp, source_uuid)
 
-      assert_receive {:span,
-                      span(
-                        name: "delete_snapshot TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("delete_snapshot #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.name": "delete_snapshot",
                "code.function": "delete_snapshot",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.source.uuid": source_uuid
              }
     end
-  end
 
-  describe "subscribe spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
-
-    test "creates span with correct attributes including stream_uuid" do
+    test "subscribe uses the started application in the span name", %{
+      application_name: application_name
+    } do
       stream_uuid = UUID.uuid4()
 
-      meta =
-        build_event_store_subscribe_metadata(
-          application: TestApp,
-          stream_uuid: stream_uuid
-        )
+      assert :ok = EventStore.subscribe(DefaultApp, stream_uuid)
 
-      :telemetry.span([:commanded, :event_store, :subscribe], meta, fn ->
-        {:ok, meta}
-      end)
-
-      assert_receive {:span,
-                      span(
-                        name: "subscribe TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("subscribe #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.type": :receive,
                "messaging.operation.name": "subscribe",
                "code.function": "subscribe",
-               "commanded.application": TestApp,
+               "commanded.application": DefaultApp,
                "commanded.stream.uuid": stream_uuid
              }
     end
-  end
 
-  describe "unsubscribe spans" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
-    end
+    test "unsubscribe uses the started application in the span name", %{
+      application_name: application_name
+    } do
+      subscription_name = unique_subscription_name()
 
-    test "creates span with correct attributes" do
-      meta =
-        build_event_store_unsubscribe_metadata(
-          application: TestApp,
-          subscription: self()
-        )
+      assert {:ok, subscription} =
+               EventStore.subscribe_to(DefaultApp, :all, subscription_name, self(), :origin)
 
-      :telemetry.span([:commanded, :event_store, :unsubscribe], meta, fn ->
-        {:ok, meta}
-      end)
+      assert_receive {:subscribed, ^subscription}, 1000
+      _ = assert_receive_span_named("subscribe_to #{application_name}")
 
-      assert_receive {:span,
-                      span(
-                        name: "unsubscribe TestApp",
-                        kind: :internal,
-                        attributes: attributes
-                      )},
-                     1000
+      assert :ok = EventStore.unsubscribe(DefaultApp, subscription)
+
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("unsubscribe #{application_name}")
 
       assert :otel_attributes.map(attributes) == %{
                "messaging.system": "commanded",
                "messaging.operation.name": "unsubscribe",
                "code.function": "unsubscribe",
-               "commanded.application": TestApp
+               "commanded.application": DefaultApp
+             }
+    end
+
+    test "delete_subscription uses the started application in the span name", %{
+      application_name: application_name
+    } do
+      subscription_name = unique_subscription_name()
+
+      assert {:ok, subscription} =
+               EventStore.subscribe_to(DefaultApp, :all, subscription_name, self(), :origin)
+
+      assert_receive {:subscribed, ^subscription}, 1000
+      _ = assert_receive_span_named("subscribe_to #{application_name}")
+
+      assert :ok = EventStore.unsubscribe(DefaultApp, subscription)
+      _ = assert_receive_span_named("unsubscribe #{application_name}")
+
+      assert :ok = EventStore.delete_subscription(DefaultApp, :all, subscription_name)
+
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("delete_subscription #{application_name}")
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.name": "delete_subscription",
+               "code.function": "delete_subscription",
+               "commanded.application": DefaultApp
+             }
+    end
+
+    test "missing streams still emit spans for the started application", %{
+      application_name: application_name
+    } do
+      stream_uuid = UUID.uuid4()
+
+      assert {:error, :stream_not_found} = EventStore.stream_forward(DefaultApp, stream_uuid)
+
+      assert span(kind: :internal, attributes: attributes) =
+               assert_receive_span_named("stream_forward #{application_name}")
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :receive,
+               "messaging.operation.name": "stream_forward",
+               "code.function": "stream_forward",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid
              }
     end
   end
 
-  describe "operations without stream_uuid" do
-    setup do
-      detach_handlers()
-      OTelEventStore.setup()
-      :ok
+  describe "synthetic coverage for internal branches" do
+    test "stop events set error status when metadata includes error" do
+      stream_uuid = UUID.uuid4()
+      application_name = inspect(DefaultApp)
+      span_name = "append_to_stream #{application_name}"
+
+      meta =
+        build_event_store_append_to_stream_metadata(
+          application: DefaultApp,
+          stream_uuid: stream_uuid,
+          expected_version: 0
+        )
+
+      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :event_store, :append_to_stream, :stop],
+        %{duration: 1000},
+        Map.put(meta, :error, :stream_not_found)
+      )
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message == ":stream_not_found"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "error.type": "stream_not_found"
+             }
     end
 
-    test "creates span name without stream_uuid suffix" do
-      meta = build_event_store_delete_subscription_metadata(application: TestApp)
+    test "exception events keep exception type and message attributes" do
+      stream_uuid = UUID.uuid4()
+      application_name = inspect(DefaultApp)
+      span_name = "append_to_stream #{application_name}"
 
-      :telemetry.span([:commanded, :event_store, :delete_subscription], meta, fn ->
-        {:ok, meta}
-      end)
+      meta =
+        build_event_store_append_to_stream_metadata(
+          application: DefaultApp,
+          stream_uuid: stream_uuid,
+          expected_version: 0
+        )
 
-      assert_receive {:span,
-                      span(
-                        name: "delete_subscription TestApp",
-                        kind: :internal
-                      )},
-                     1000
+      :telemetry.execute([:commanded, :event_store, :append_to_stream, :start], %{}, meta)
+
+      :telemetry.execute(
+        [:commanded, :event_store, :append_to_stream, :exception],
+        %{duration: 100},
+        Map.merge(meta, %{
+          kind: :error,
+          reason: %RuntimeError{message: "failed"},
+          stacktrace: []
+        })
+      )
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes,
+               events: events
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message == "** (RuntimeError) failed"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.RuntimeError"
+             }
+
+      assert_exception_event(events, "Elixir.RuntimeError", "failed")
     end
+  end
+
+  describe "exception spans" do
+    test "unstarted applications emit exception spans without detaching the handler" do
+      stream_uuid = UUID.uuid4()
+      application_name = inspect(DefaultApp)
+      span_name = "append_to_stream #{application_name}"
+
+      assert_raise RuntimeError, fn ->
+        EventStore.append_to_stream(DefaultApp, stream_uuid, 0, [%EventData{}])
+      end
+
+      assert span(
+               name: ^span_name,
+               status: {:status, :error, error_message},
+               attributes: attributes,
+               events: events
+             ) = assert_receive_span_named(span_name)
+
+      assert error_message =~ "could not lookup #{application_name}"
+
+      assert :otel_attributes.map(attributes) == %{
+               "messaging.system": "commanded",
+               "messaging.operation.type": :publish,
+               "messaging.operation.name": "append_to_stream",
+               "code.function": "append_to_stream",
+               "commanded.application": DefaultApp,
+               "commanded.stream.uuid": stream_uuid,
+               "commanded.expected_version": 0,
+               "erlang.exception.kind": :error,
+               "error.type": "Elixir.RuntimeError"
+             }
+
+      assert_exception_event(events, "Elixir.RuntimeError")
+      assert_handler_attached(:append_to_stream)
+    end
+  end
+
+  defp build_snapshot(source_uuid) do
+    %SnapshotData{
+      source_uuid: source_uuid,
+      source_version: 5,
+      source_type: "Elixir.Commanded.TestSupport.TestDomain.Account",
+      data: build_account(account_id: source_uuid),
+      metadata: %{},
+      created_at: DateTime.utc_now()
+    }
+  end
+
+  defp unique_subscription_name do
+    "subscription-#{System.unique_integer([:positive])}"
+  end
+
+  defp assert_receive_span_named(name, timeout \\ 1000) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+
+    receive_span_named(name, deadline)
+  end
+
+  defp receive_span_named(name, deadline) do
+    timeout = max(deadline - System.monotonic_time(:millisecond), 0)
+
+    receive do
+      {:span, span(name: ^name) = span_record} ->
+        span_record
+
+      {:span, _other} ->
+        receive_span_named(name, deadline)
+    after
+      timeout ->
+        flunk("Expected span #{inspect(name)}")
+    end
+  end
+
+  defp assert_exception_event(events, exception_type, exception_message \\ nil) do
+    events_list = :otel_events.list(events)
+    exception_event = Enum.find(events_list, fn event(name: name) -> name == :exception end)
+
+    assert exception_event
+
+    event(attributes: exc_attrs) = exception_event
+    attrs_map = :otel_attributes.map(exc_attrs)
+
+    assert attrs_map[:"exception.type"] == exception_type
+
+    if exception_message do
+      assert attrs_map[:"exception.message"] == exception_message
+    end
+  end
+
+  defp assert_handler_attached(event) do
+    handlers = :telemetry.list_handlers([:commanded, :event_store, event, :start])
+
+    assert Enum.any?(handlers, &match?(%{id: {OTelEventStore, ^event}}, &1))
   end
 
   defp detach_handlers do
