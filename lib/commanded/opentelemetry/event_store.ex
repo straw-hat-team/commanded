@@ -6,6 +6,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
   alias Commanded.OpenTelemetry.Helpers
   alias OpenTelemetry.SemConv.ErrorAttributes
   alias OpenTelemetry.SemConv.Incubating.CodeAttributes
+  alias OpenTelemetry.SemConv.Incubating.DBAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
 
@@ -50,8 +51,11 @@ defmodule Commanded.OpenTelemetry.EventStore do
       ) do
     operation_type = operation_type_for(action)
     action_name = to_string(action)
-    destination_name = event_store_destination_name(meta)
+    {adapter, adapter_meta} = fetch_event_store_adapter(meta[:application])
+    event_store_name = event_store_name(adapter_meta)
+    destination_name = to_destination_name(event_store_name)
     source_uuid = extract_source_uuid(meta)
+    connection_config = lookup_connection_config(adapter, event_store_name)
 
     attributes =
       [
@@ -60,6 +64,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
         {CodeAttributes.code_function(), action_name},
         {CommandedAttributes.commanded_application(), meta[:application]}
       ]
+      |> maybe_add_db_system(adapter)
       |> maybe_add_operation_type(operation_type)
       |> maybe_add_destination_name(destination_name)
       |> maybe_add_stream_uuid(meta[:stream_uuid])
@@ -67,6 +72,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
       |> maybe_add_subscription_name(meta[:subscription_name])
       |> maybe_add_source_uuid(source_uuid)
       |> maybe_add_start_from(meta[:start_from])
+      |> Helpers.maybe_add_connection_attributes(connection_config, peer_service: destination_name)
 
     span_name =
       case destination_name do
@@ -79,7 +85,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
       span_name,
       meta,
       %{
-        kind: :internal,
+        kind: :client,
         attributes: attributes
       }
     )
@@ -192,21 +198,28 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp extract_source_uuid(%{snapshot: %{source_uuid: uuid}}) when is_binary(uuid), do: uuid
   defp extract_source_uuid(_), do: nil
 
-  defp event_store_destination_name(meta) do
-    meta[:application]
-    |> lookup_event_store_name()
-    |> to_destination_name()
+  defp maybe_add_db_system(attrs, adapter) do
+    case db_system_for(adapter) do
+      nil -> attrs
+      system -> [{DBAttributes.db_system(), system} | attrs]
+    end
   end
 
-  defp lookup_event_store_name(application) do
-    application
-    |> fetch_event_store_adapter_meta()
-    |> event_store_name()
+  defp db_system_for(Commanded.EventStore.Adapters.EventStore), do: :postgresql
+  defp db_system_for(Commanded.EventStore.Adapters.InMemory), do: :in_memory
+  defp db_system_for(_), do: nil
+
+  defp lookup_connection_config(Commanded.EventStore.Adapters.EventStore, event_store_name)
+       when is_atom(event_store_name) and not is_nil(event_store_name) do
+    EventStore.Config.lookup(event_store_name)
+  rescue
+    _ -> []
   end
 
-  defp fetch_event_store_adapter_meta(application) do
-    {_adapter, adapter_meta} = CommandedApplication.event_store_adapter(application)
-    adapter_meta
+  defp lookup_connection_config(_adapter, _event_store_name), do: []
+
+  defp fetch_event_store_adapter(application) do
+    {_adapter, _adapter_meta} = CommandedApplication.event_store_adapter(application)
   rescue
     error ->
       :telemetry.execute(
@@ -221,7 +234,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
         }
       )
 
-      nil
+      {nil, nil}
   end
 
   defp event_store_name(adapter_meta) when is_map(adapter_meta),
