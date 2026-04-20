@@ -221,6 +221,8 @@ defmodule Commanded.Aggregates.Aggregate do
     snapshotting = Keyword.get(config, :snapshotting, %{})
     snapshot_options = Map.get(snapshotting, aggregate_module, [])
 
+    metadata = Keyword.get(aggregate_opts, :metadata, %{})
+
     state = %Aggregate{
       application: application,
       aggregate_module: aggregate_module,
@@ -228,7 +230,7 @@ defmodule Commanded.Aggregates.Aggregate do
       snapshotting: Snapshotting.new(application, aggregate_uuid, snapshot_options)
     }
 
-    GenServer.start_link(__MODULE__, state, start_opts)
+    GenServer.start_link(__MODULE__, {state, metadata}, start_opts)
   end
 
   @doc false
@@ -336,16 +338,14 @@ defmodule Commanded.Aggregates.Aggregate do
 
   @doc false
   @impl GenServer
-  def init(%Aggregate{} = state) do
-    # Initial aggregate state is populated by loading its state snapshot and/or
-    # events from the event store.
-    {:ok, state, {:continue, :populate_aggregate_state}}
+  def init({%Aggregate{} = state, metadata}) do
+    {:ok, state, {:continue, {:populate_aggregate_state, metadata}}}
   end
 
   @doc false
   @impl GenServer
-  def handle_continue(:populate_aggregate_state, %Aggregate{} = state) do
-    state = AggregateStateBuilder.populate(state)
+  def handle_continue({:populate_aggregate_state, metadata}, %Aggregate{} = state) do
+    %Aggregate{} = state = AggregateStateBuilder.populate(state, metadata)
 
     # Subscribe to aggregate's events to catch any events appended to its stream
     # by another process, such as directly appended to the event store.

@@ -643,7 +643,8 @@ defmodule Commanded.TestSupport.Factory do
       aggregate_module: Keyword.fetch!(opts, :aggregate_module),
       aggregate_uuid: Keyword.fetch!(opts, :aggregate_uuid),
       aggregate_state: Keyword.fetch!(opts, :aggregate_state),
-      aggregate_version: Keyword.fetch!(opts, :aggregate_version)
+      aggregate_version: Keyword.fetch!(opts, :aggregate_version),
+      metadata: Keyword.get(opts, :metadata, %{})
     }
   end
 

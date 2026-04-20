@@ -116,7 +116,8 @@ defmodule Commanded.Commands.Dispatcher do
       Commanded.Aggregates.Supervisor.open_aggregate(
         application,
         aggregate_module,
-        aggregate_uuid
+        aggregate_uuid,
+        context.metadata
       )
 
     task_dispatcher_name = Module.concat([application, Commanded.Commands.TaskDispatcher])

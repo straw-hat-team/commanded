@@ -24,7 +24,9 @@ defmodule Commanded.Aggregates.Supervisor do
   Returns `{:ok, aggregate_uuid}` when a process is successfully started, or is
   already running.
   """
-  def open_aggregate(application, aggregate_module, aggregate_uuid)
+  def open_aggregate(application, aggregate_module, aggregate_uuid, metadata \\ %{})
+
+  def open_aggregate(application, aggregate_module, aggregate_uuid, metadata)
       when is_atom(application) and is_atom(aggregate_module) and is_binary(aggregate_uuid) do
     Logger.debug(fn ->
       "Locating aggregate process for `#{inspect(aggregate_module)}` with UUID " <>
@@ -37,7 +39,8 @@ defmodule Commanded.Aggregates.Supervisor do
     args = [
       application: application,
       aggregate_module: aggregate_module,
-      aggregate_uuid: aggregate_uuid
+      aggregate_uuid: aggregate_uuid,
+      metadata: metadata
     ]
 
     case Registration.start_child(application, aggregate_name, supervisor_name, {Aggregate, args}) do
@@ -55,7 +58,7 @@ defmodule Commanded.Aggregates.Supervisor do
     end
   end
 
-  def open_aggregate(_application, _aggregate_module, aggregate_uuid),
+  def open_aggregate(_application, _aggregate_module, aggregate_uuid, _metadata),
     do: {:error, {:unsupported_aggregate_identity_type, aggregate_uuid}}
 
   def init(args) do

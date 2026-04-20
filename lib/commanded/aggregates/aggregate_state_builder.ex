@@ -72,7 +72,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   Otherwise start with the aggregate struct and stream all existing events for
   the aggregate from the event store to rebuild its state from those events.
   """
-  def populate(%Aggregate{} = state) do
+  def populate(%Aggregate{} = state, metadata \\ %{}) do
     %Aggregate{aggregate_module: aggregate_module, snapshotting: snapshotting} = state
 
     {aggregate, snapshot_used, snapshot_source_version} =
@@ -98,7 +98,8 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
 
     rebuild_from_events(aggregate,
       snapshot_used: snapshot_used,
-      snapshot_source_version: snapshot_source_version
+      snapshot_source_version: snapshot_source_version,
+      metadata: metadata
     )
   end
 
@@ -113,9 +114,10 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
   def rebuild_from_events(%Aggregate{} = state, opts \\ []) do
     snapshot_used = Keyword.get(opts, :snapshot_used, false)
     snapshot_source_version = Keyword.get(opts, :snapshot_source_version)
+    metadata = Keyword.get(opts, :metadata, %{})
 
     load_prefix = [:commanded, :aggregate, :load]
-    meta = telemetry_metadata(state)
+    meta = telemetry_metadata(state, metadata)
     load_start = Telemetry.start(load_prefix, meta)
 
     %Aggregate{
@@ -190,7 +192,7 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     })
   end
 
-  defp telemetry_metadata(%Aggregate{} = state) do
+  defp telemetry_metadata(%Aggregate{} = state, metadata \\ %{}) do
     %Aggregate{
       application: application,
       aggregate_module: aggregate_module,
@@ -204,7 +206,8 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
       aggregate_module: aggregate_module,
       aggregate_uuid: aggregate_uuid,
       aggregate_state: aggregate_state,
-      aggregate_version: aggregate_version
+      aggregate_version: aggregate_version,
+      metadata: metadata
     }
   end
 end
