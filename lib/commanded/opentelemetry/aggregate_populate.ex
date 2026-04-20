@@ -30,6 +30,11 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
         meta,
         _config
       ) do
+    case Helpers.extract_propagated_ctx(meta[:metadata]) do
+      {_links, :undefined} -> :ok
+      {_links, ctx} -> :otel_ctx.attach(ctx)
+    end
+
     aggregate_module_name = Helpers.module_name(meta.aggregate_module)
 
     attributes = [

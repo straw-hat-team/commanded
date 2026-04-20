@@ -11,6 +11,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
   alias Commanded.TestSupport.Factory
   alias Commanded.UUID
 
+  require OpenTelemetry.Tracer, as: Tracer
+
   setup do
     detach_populate_handlers()
     AggregatePopulate.setup()
@@ -257,6 +259,133 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "commanded.event.count": 10
              }
     end
+  end
+
+  describe "trace context propagation" do
+    setup do
+      detach_populate_handlers()
+      AggregatePopulate.setup()
+      :ok
+    end
+
+    test "load span becomes child of caller when traceparent is in metadata" do
+      {parent_trace_id, parent_span_id, traceparent} =
+        Tracer.with_span "parent.command.dispatch" do
+          ctx = Tracer.current_span_ctx()
+
+          {
+            :otel_span.trace_id(ctx),
+            :otel_span.span_id(ctx),
+            encode_traceparent(ctx)
+          }
+        end
+
+      meta =
+        Factory.build_aggregate_populate_metadata(
+          metadata: %{"traceparent" => traceparent}
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: false,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "load MockAggregate",
+                        trace_id: child_trace_id,
+                        parent_span_id: received_parent_span_id
+                      )},
+                     1000
+
+      assert child_trace_id == parent_trace_id
+      assert received_parent_span_id == parent_span_id
+    end
+
+    test "load span is independent when no traceparent in metadata" do
+      meta = Factory.build_aggregate_populate_metadata(metadata: %{})
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: false,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "load MockAggregate",
+                        parent_span_id: :undefined
+                      )},
+                     1000
+    end
+
+    test "load span is independent when traceparent is invalid" do
+      meta =
+        Factory.build_aggregate_populate_metadata(
+          metadata: %{"traceparent" => "invalid-format"}
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: false,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "load MockAggregate",
+                        parent_span_id: :undefined
+                      )},
+                     1000
+    end
+
+    test "load span is independent when metadata key is nil" do
+      meta =
+        Factory.build_aggregate_populate_metadata()
+        |> Map.put(:metadata, nil)
+
+      :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
+
+      stop_meta =
+        Factory.build_aggregate_load_stop_metadata(meta,
+          snapshot_used: false,
+          aggregate_version: 0
+        )
+
+      :telemetry.execute([:commanded, :aggregate, :load, :stop], %{count: 0}, stop_meta)
+
+      assert_receive {:span,
+                      span(
+                        name: "load MockAggregate",
+                        parent_span_id: :undefined
+                      )},
+                     1000
+    end
+  end
+
+  defp encode_traceparent(span_ctx) do
+    trace_id = :otel_span.trace_id(span_ctx)
+    span_id = :otel_span.span_id(span_ctx)
+    trace_flags = span_ctx(span_ctx, :trace_flags)
+
+    hex_trace_id = :io_lib.format("~32.16.0b", [trace_id]) |> IO.iodata_to_binary()
+    hex_span_id = :io_lib.format("~16.16.0b", [span_id]) |> IO.iodata_to_binary()
+    hex_flags = :io_lib.format("~2.16.0b", [trace_flags]) |> IO.iodata_to_binary()
+
+    "00-#{hex_trace_id}-#{hex_span_id}-#{hex_flags}"
   end
 
   defp detach_populate_handlers do
