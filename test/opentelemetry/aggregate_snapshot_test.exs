@@ -85,7 +85,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
                "messaging.destination.name": "MockAggregate",
                "code.function": "snapshot",
                "code.namespace": "MockAggregate",
-               "commanded.application": MockApp,
+               "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 10,
                "commanded.snapshot.every": 5,

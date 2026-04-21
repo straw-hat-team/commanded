@@ -81,13 +81,13 @@ defmodule Commanded.OpenTelemetry.EventHandler do
       {MessagingAttributes.messaging_destination_subscription_name(), meta.handler_name},
       {MessagingAttributes.messaging_message_id(), recorded_event.event_id},
       {MessagingAttributes.messaging_message_conversation_id(), recorded_event.correlation_id},
-      {MessagingAttributes.messaging_consumer_group_name(), meta.application},
+      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
       # OTel Code SemConv
       {CodeAttributes.code_function(), "handle"},
       {CodeAttributes.code_namespace(), handler_module_name},
       # Commanded-specific
       {CommandedAttributes.commanded_handler_kind(), "event_handler"},
-      {CommandedAttributes.commanded_application(), meta.application},
+      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
       {CommandedAttributes.commanded_handler_name(), meta.handler_name},
       {CommandedAttributes.commanded_event(), recorded_event.event_type},
       {CommandedAttributes.commanded_event_number(), recorded_event.event_number},
@@ -184,14 +184,14 @@ defmodule Commanded.OpenTelemetry.EventHandler do
       {MessagingAttributes.messaging_operation_name(), "batch"},
       {MessagingAttributes.messaging_destination_name(), handler_module_name},
       {MessagingAttributes.messaging_destination_subscription_name(), meta.handler_name},
-      {MessagingAttributes.messaging_consumer_group_name(), meta.application},
+      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
       {MessagingAttributes.messaging_batch_message_count(), meta.event_count},
       # OTel Code SemConv
       {CodeAttributes.code_function(), "handle_batch"},
       {CodeAttributes.code_namespace(), handler_module_name},
       # Commanded-specific
       {CommandedAttributes.commanded_handler_kind(), "event_handler"},
-      {CommandedAttributes.commanded_application(), meta.application},
+      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
       {CommandedAttributes.commanded_handler_name(), meta.handler_name},
       {CommandedAttributes.commanded_event_count(), meta.event_count},
       {CommandedAttributes.commanded_batch_first_event_id(), meta.first_event_id},

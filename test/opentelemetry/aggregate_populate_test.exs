@@ -90,7 +90,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
                "code.namespace": "MockAggregate",
-               "commanded.application": MockApp,
+               "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 5,
                "commanded.event.count": 0
@@ -140,7 +140,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.destination.name": "MockAggregate",
                "code.function": "load",
                "code.namespace": "MockAggregate",
-               "commanded.application": MockApp,
+               "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
                "commanded.event.count": 0,
@@ -217,7 +217,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
                "code.namespace": "MockAggregate",
-               "commanded.application": MockApp,
+               "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
                "commanded.event.count": 0
@@ -253,7 +253,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.destination.name": "MockAggregate",
                "code.function": "populate",
                "code.namespace": "MockAggregate",
-               "commanded.application": MockApp,
+               "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 10,
                "commanded.event.count": 10
