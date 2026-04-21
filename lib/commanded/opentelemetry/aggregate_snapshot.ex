@@ -40,7 +40,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
         {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
         {CodeAttributes.code_function(), "snapshot"},
         {CodeAttributes.code_namespace(), aggregate_module_name},
-        {CommandedAttributes.commanded_application(), meta.application},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
         {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
         {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
       ]

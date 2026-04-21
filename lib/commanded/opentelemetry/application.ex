@@ -47,7 +47,7 @@ defmodule Commanded.OpenTelemetry.Application do
       {CodeAttributes.code_namespace(), handler_module_name},
       # Commanded-specific
       {CommandedAttributes.commanded_handler_kind(), "command_handler"},
-      {CommandedAttributes.commanded_application(), meta.application},
+      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
       {CommandedAttributes.commanded_command(), Helpers.struct_name(context.command)},
       {CommandedAttributes.commanded_correlation_id(), context.correlation_id},
       {CommandedAttributes.commanded_causation_id(), context.causation_id}

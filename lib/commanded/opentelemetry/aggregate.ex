@@ -47,13 +47,13 @@ defmodule Commanded.OpenTelemetry.Aggregate do
       {MessagingAttributes.messaging_destination_name(), handler_module_name},
       {MessagingAttributes.messaging_message_id(), context.causation_id},
       {MessagingAttributes.messaging_message_conversation_id(), context.correlation_id},
-      {MessagingAttributes.messaging_consumer_group_name(), meta.application},
+      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
       # OTel Code SemConv
       {CodeAttributes.code_function(), to_string(context.function)},
       {CodeAttributes.code_namespace(), handler_module_name},
       # Commanded-specific
       {CommandedAttributes.commanded_handler_kind(), "aggregate"},
-      {CommandedAttributes.commanded_application(), meta.application},
+      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
       {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
       {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version},
       {CommandedAttributes.commanded_command(), Helpers.struct_name(context.command)},

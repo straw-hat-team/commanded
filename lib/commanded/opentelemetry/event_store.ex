@@ -57,7 +57,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
         {MessagingAttributes.messaging_system(), "commanded"},
         {MessagingAttributes.messaging_operation_name(), action_name},
         {CodeAttributes.code_function(), action_name},
-        {CommandedAttributes.commanded_application(), meta[:application]}
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta[:application])}
       ]
       |> maybe_add_db_system(adapter)
       |> Helpers.maybe_add_operation_type(operation_type)
