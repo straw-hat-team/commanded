@@ -1,6 +1,9 @@
 defmodule Commanded.OpenTelemetry.Helpers do
   @moduledoc false
 
+  alias OpenTelemetry.SemConv.Incubating.DBAttributes
+  alias OpenTelemetry.SemConv.Incubating.PeerAttributes
+  alias OpenTelemetry.SemConv.ServerAttributes
   alias OpenTelemetry.Span
 
   def extract_propagated_ctx(nil), do: {[], :undefined}
@@ -108,4 +111,19 @@ defmodule Commanded.OpenTelemetry.Helpers do
 
   def struct_name(%name{}), do: inspect(name)
   def struct_name(_), do: nil
+
+  def maybe_add_connection_attributes(attrs, config, opts \\ [])
+
+  def maybe_add_connection_attributes(attrs, [_ | _] = config, opts) do
+    attrs
+    |> maybe_add_attr(ServerAttributes.server_address(), config[:hostname])
+    |> maybe_add_attr(ServerAttributes.server_port(), config[:port])
+    |> maybe_add_attr(DBAttributes.db_namespace(), config[:database])
+    |> maybe_add_attr(PeerAttributes.peer_service(), opts[:peer_service])
+  end
+
+  def maybe_add_connection_attributes(attrs, _config, _opts), do: attrs
+
+  def maybe_add_attr(attrs, _key, nil), do: attrs
+  def maybe_add_attr(attrs, key, value), do: [{key, value} | attrs]
 end

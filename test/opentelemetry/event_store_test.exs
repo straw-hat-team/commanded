@@ -84,7 +84,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.append_to_stream(DefaultApp, stream_uuid, 0, build_events(1))
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("append_to_stream #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -95,7 +95,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "code.function": "append_to_stream",
                "commanded.application": DefaultApp,
                "commanded.stream.uuid": stream_uuid,
-               "commanded.expected_version": 0
+               "commanded.expected_version": 0,
+               "db.system": :in_memory
              }
     end
 
@@ -109,7 +110,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert [_event] = EventStore.stream_forward(DefaultApp, stream_uuid, 0)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("stream_forward #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -119,7 +120,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "stream_forward",
                "commanded.application": DefaultApp,
-               "commanded.stream.uuid": stream_uuid
+               "commanded.stream.uuid": stream_uuid,
+               "db.system": :in_memory
              }
     end
 
@@ -133,7 +135,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert_receive {:subscribed, ^subscription}, 1000
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("subscribe_to #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -146,7 +148,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "commanded.application": DefaultApp,
                "commanded.stream.uuid": :all,
                "commanded.subscription.name": subscription_name,
-               "commanded.start_from": "origin"
+               "commanded.start_from": "origin",
+               "db.system": :in_memory
              }
     end
 
@@ -168,7 +171,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.ack_event(DefaultApp, subscription, event)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("ack_event #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -177,7 +180,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.operation.name": "ack_event",
                "messaging.destination.name": destination_name,
                "code.function": "ack_event",
-               "commanded.application": DefaultApp
+               "commanded.application": DefaultApp,
+               "db.system": :in_memory
              }
     end
 
@@ -189,7 +193,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.record_snapshot(DefaultApp, snapshot)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("record_snapshot #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -199,7 +203,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "record_snapshot",
                "commanded.application": DefaultApp,
-               "commanded.source.uuid": source_uuid
+               "commanded.source.uuid": source_uuid,
+               "db.system": :in_memory
              }
     end
 
@@ -215,7 +220,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
       assert {:ok, %SnapshotData{source_uuid: ^source_uuid}} =
                EventStore.read_snapshot(DefaultApp, source_uuid)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("read_snapshot #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -225,7 +230,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "read_snapshot",
                "commanded.application": DefaultApp,
-               "commanded.source.uuid": source_uuid
+               "commanded.source.uuid": source_uuid,
+               "db.system": :in_memory
              }
     end
 
@@ -240,7 +246,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.delete_snapshot(DefaultApp, source_uuid)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("delete_snapshot #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -249,7 +255,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "delete_snapshot",
                "commanded.application": DefaultApp,
-               "commanded.source.uuid": source_uuid
+               "commanded.source.uuid": source_uuid,
+               "db.system": :in_memory
              }
     end
 
@@ -260,7 +267,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.subscribe(DefaultApp, stream_uuid)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("subscribe #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -270,7 +277,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "subscribe",
                "commanded.application": DefaultApp,
-               "commanded.stream.uuid": stream_uuid
+               "commanded.stream.uuid": stream_uuid,
+               "db.system": :in_memory
              }
     end
 
@@ -287,7 +295,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.unsubscribe(DefaultApp, subscription)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("unsubscribe #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -295,7 +303,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.operation.name": "unsubscribe",
                "messaging.destination.name": destination_name,
                "code.function": "unsubscribe",
-               "commanded.application": DefaultApp
+               "commanded.application": DefaultApp,
+               "db.system": :in_memory
              }
     end
 
@@ -315,7 +324,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert :ok = EventStore.delete_subscription(DefaultApp, :all, subscription_name)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("delete_subscription #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -323,7 +332,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.operation.name": "delete_subscription",
                "messaging.destination.name": destination_name,
                "code.function": "delete_subscription",
-               "commanded.application": DefaultApp
+               "commanded.application": DefaultApp,
+               "db.system": :in_memory
              }
     end
 
@@ -334,7 +344,7 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
 
       assert {:error, :stream_not_found} = EventStore.stream_forward(DefaultApp, stream_uuid)
 
-      assert span(kind: :internal, attributes: attributes) =
+      assert span(kind: :client, attributes: attributes) =
                assert_receive_span_named("stream_forward #{destination_name}")
 
       assert :otel_attributes.map(attributes) == %{
@@ -344,7 +354,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "messaging.destination.name": destination_name,
                "code.function": "stream_forward",
                "commanded.application": DefaultApp,
-               "commanded.stream.uuid": stream_uuid
+               "commanded.stream.uuid": stream_uuid,
+               "db.system": :in_memory
              }
     end
   end
@@ -474,7 +485,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "commanded.stream.uuid": stream_uuid,
                "commanded.expected_version": 0,
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.FunctionClauseError"
+               "error.type": "Elixir.FunctionClauseError",
+               "db.system": :in_memory
              }
 
       assert_handler_attached(:append_to_stream)
@@ -526,7 +538,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "commanded.application": DefaultApp,
                "commanded.stream.uuid": stream_uuid,
                "commanded.expected_version": 0,
-               "error.type": "stream_not_found"
+               "error.type": "stream_not_found",
+               "db.system": :in_memory
              }
     end
 
@@ -574,7 +587,8 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
                "commanded.stream.uuid": stream_uuid,
                "commanded.expected_version": 0,
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.RuntimeError"
+               "error.type": "Elixir.RuntimeError",
+               "db.system": :in_memory
              }
 
       assert_exception_event(events, "Elixir.RuntimeError", "failed")
