@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.7.0](https://github.com/straw-hat-team/commanded/compare/v3.6.1...v3.7.0) (2026-04-21)
+
+
+### Features
+
+* **telemetry:** Propagate caller trace context to aggregate load spans ([#90](https://github.com/straw-hat-team/commanded/issues/90)) ([9a6ee07](https://github.com/straw-hat-team/commanded/commit/9a6ee0702f4a91bdba705b682c1b0bc270900c19))
+
+
+### Bug Fixes
+
+* **telemetry:** Add peer.service and DB semantic attributes to EventStore spans ([#91](https://github.com/straw-hat-team/commanded/issues/91)) ([d09a91e](https://github.com/straw-hat-team/commanded/commit/d09a91e60489d4b3c49a73e7e2ff5e4a74ca09fd))
+* **telemetry:** Enrich EventStore spans with full OTel semantic attributes ([#92](https://github.com/straw-hat-team/commanded/issues/92)) ([0d0763a](https://github.com/straw-hat-team/commanded/commit/0d0763af83f2c0209f387f31fc1b231bacc670c4))
+* **telemetry:** Strip Elixir. prefix from commanded.application attribute ([#93](https://github.com/straw-hat-team/commanded/issues/93)) ([909c484](https://github.com/straw-hat-team/commanded/commit/909c48477fb34444e29e65d0d6a9bd1669354f49))
+* **test:** Keep adapter coverage aligned with EventStore semantics ([#87](https://github.com/straw-hat-team/commanded/issues/87)) ([6aa37fd](https://github.com/straw-hat-team/commanded/commit/6aa37fd70bd87874c9b8e3c3df2788560c34cd5c))
+
 ## [3.6.1](https://github.com/straw-hat-team/commanded/compare/v3.6.0...v3.6.1) (2026-04-16)
 
 
