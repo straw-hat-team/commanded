@@ -184,4 +184,16 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   """
   @spec commanded_registry_adapter() :: :"commanded.registry.adapter"
   def commanded_registry_adapter, do: :"commanded.registry.adapter"
+
+  @doc """
+  The version number to start reading a stream from.
+  """
+  @spec commanded_stream_start_version() :: :"commanded.stream.start_version"
+  def commanded_stream_start_version, do: :"commanded.stream.start_version"
+
+  @doc """
+  The batch size used when reading events from a stream.
+  """
+  @spec commanded_stream_batch_size() :: :"commanded.stream.batch_size"
+  def commanded_stream_batch_size, do: :"commanded.stream.batch_size"
 end

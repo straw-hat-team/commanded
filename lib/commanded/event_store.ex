@@ -36,7 +36,8 @@ defmodule Commanded.EventStore do
     meta = %{
       application: application,
       stream_uuid: stream_uuid,
-      expected_version: expected_version
+      expected_version: expected_version,
+      event_count: length(events)
     }
 
     span(:append_to_stream, meta, fn ->

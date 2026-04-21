@@ -224,7 +224,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.stream.id": recorded_event.stream_id,
                "commanded.stream.version": recorded_event.stream_version,
                "commanded.handler.kind": "event_handler",
-               "error.type": "unique_constraint_violation"
+               "error.type": ":unique_constraint_violation"
              }
     end
 
@@ -267,7 +267,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.stream.version": recorded_event.stream_version,
                "commanded.handler.kind": "event_handler",
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.KeyError"
+               "error.type": "KeyError"
              }
 
       events_list = :otel_events.list(events)
@@ -338,7 +338,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.stream.version": recorded_event.stream_version,
                "commanded.handler.kind": "event_handler",
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.ArgumentError"
+               "error.type": "ArgumentError"
              }
     end
 
@@ -386,7 +386,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.stream.version": recorded_event.stream_version,
                "commanded.handler.kind": "event_handler",
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.RuntimeError"
+               "error.type": "RuntimeError"
              }
     end
   end
@@ -440,7 +440,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.handler.kind": "event_handler",
                "commanded.batch.first_event_id": first_event_id,
                "commanded.batch.last_event_id": last_event_id,
-               "error.type": "transaction_rollback"
+               "error.type": ":transaction_rollback"
              }
     end
 
@@ -484,7 +484,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.batch.first_event_id": first_event_id,
                "commanded.batch.last_event_id": last_event_id,
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.DBConnection.ConnectionError"
+               "error.type": "DBConnection.ConnectionError"
              }
 
       events_list = :otel_events.list(events)

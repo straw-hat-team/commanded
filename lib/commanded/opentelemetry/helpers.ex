@@ -1,7 +1,9 @@
 defmodule Commanded.OpenTelemetry.Helpers do
   @moduledoc false
 
+  alias Commanded.OpenTelemetry.CommandedAttributes
   alias OpenTelemetry.SemConv.Incubating.DBAttributes
+  alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.SemConv.Incubating.PeerAttributes
   alias OpenTelemetry.SemConv.ServerAttributes
   alias OpenTelemetry.Span
@@ -45,12 +47,9 @@ defmodule Commanded.OpenTelemetry.Helpers do
 
   # Emits telemetry for unknown error types so users can detect unexpected
   # error formats in their monitoring and fix them.
-  def to_error_type(%{__struct__: module}, _tracer_id), do: to_string(module)
+  def to_error_type(error, _tracer_id) when is_struct(error), do: inspect(error.__struct__)
 
-  def to_error_type(%{__exception__: true} = exception, _tracer_id),
-    do: to_string(exception.__struct__)
-
-  def to_error_type(error, _tracer_id) when is_atom(error), do: to_string(error)
+  def to_error_type(error, _tracer_id) when is_atom(error), do: inspect(error)
 
   def to_error_type(error, tracer_id) do
     :telemetry.execute(
@@ -112,18 +111,61 @@ defmodule Commanded.OpenTelemetry.Helpers do
   def struct_name(%name{}), do: inspect(name)
   def struct_name(_), do: nil
 
-  def maybe_add_connection_attributes(attrs, config, opts \\ [])
-
-  def maybe_add_connection_attributes(attrs, [_ | _] = config, opts) do
+  def maybe_add_connection_attributes(attrs, [_ | _] = config) do
     attrs
     |> maybe_add_attr(ServerAttributes.server_address(), config[:hostname])
     |> maybe_add_attr(ServerAttributes.server_port(), config[:port])
     |> maybe_add_attr(DBAttributes.db_namespace(), config[:database])
-    |> maybe_add_attr(PeerAttributes.peer_service(), opts[:peer_service])
+    |> maybe_add_attr(PeerAttributes.peer_service(), config[:database])
   end
 
-  def maybe_add_connection_attributes(attrs, _config, _opts), do: attrs
+  def maybe_add_connection_attributes(attrs, _config), do: attrs
 
   def maybe_add_attr(attrs, _key, nil), do: attrs
   def maybe_add_attr(attrs, key, value), do: [{key, value} | attrs]
+
+  def maybe_add_operation_type(attrs, nil), do: attrs
+
+  def maybe_add_operation_type(attrs, type),
+    do: [{MessagingAttributes.messaging_operation_type(), type} | attrs]
+
+  def maybe_add_destination_name(attrs, nil), do: attrs
+
+  def maybe_add_destination_name(attrs, name),
+    do: [{MessagingAttributes.messaging_destination_name(), name} | attrs]
+
+  def maybe_add_stream_uuid(attrs, nil), do: attrs
+
+  def maybe_add_stream_uuid(attrs, uuid),
+    do: [{CommandedAttributes.commanded_stream_uuid(), uuid} | attrs]
+
+  def maybe_add_expected_version(attrs, nil), do: attrs
+
+  def maybe_add_expected_version(attrs, version),
+    do: [{CommandedAttributes.commanded_expected_version(), version} | attrs]
+
+  def maybe_add_event_count(attrs, nil), do: attrs
+
+  def maybe_add_event_count(attrs, count),
+    do: [{CommandedAttributes.commanded_event_count(), count} | attrs]
+
+  def maybe_add_subscription_name(attrs, nil), do: attrs
+
+  def maybe_add_subscription_name(attrs, name) do
+    [
+      {MessagingAttributes.messaging_destination_subscription_name(), name},
+      {CommandedAttributes.commanded_subscription_name(), name}
+      | attrs
+    ]
+  end
+
+  def maybe_add_source_uuid(attrs, nil), do: attrs
+
+  def maybe_add_source_uuid(attrs, uuid),
+    do: [{CommandedAttributes.commanded_source_uuid(), uuid} | attrs]
+
+  def to_destination_name(nil), do: nil
+  def to_destination_name(name) when is_binary(name), do: name
+  def to_destination_name(name) when is_atom(name), do: inspect(name)
+  def to_destination_name(_), do: nil
 end

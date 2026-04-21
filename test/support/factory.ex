@@ -1125,7 +1125,8 @@ defmodule Commanded.TestSupport.Factory do
     defaults = [
       application: Keyword.get(opts, :application, MockApp),
       stream_uuid: Keyword.get(opts, :stream_uuid, UUID.uuid4()),
-      expected_version: Keyword.get(opts, :expected_version, 0)
+      expected_version: Keyword.get(opts, :expected_version, 0),
+      event_count: Keyword.get(opts, :event_count, 1)
     ]
 
     opts = Keyword.merge(defaults, opts)
@@ -1133,7 +1134,8 @@ defmodule Commanded.TestSupport.Factory do
     %{
       application: Keyword.fetch!(opts, :application),
       stream_uuid: Keyword.fetch!(opts, :stream_uuid),
-      expected_version: Keyword.fetch!(opts, :expected_version)
+      expected_version: Keyword.fetch!(opts, :expected_version),
+      event_count: Keyword.fetch!(opts, :event_count)
     }
   end
 

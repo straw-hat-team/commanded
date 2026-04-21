@@ -281,9 +281,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
         end
 
       meta =
-        Factory.build_aggregate_populate_metadata(
-          metadata: %{"traceparent" => traceparent}
-        )
+        Factory.build_aggregate_populate_metadata(metadata: %{"traceparent" => traceparent})
 
       :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
 
@@ -330,9 +328,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
 
     test "load span is independent when traceparent is invalid" do
       meta =
-        Factory.build_aggregate_populate_metadata(
-          metadata: %{"traceparent" => "invalid-format"}
-        )
+        Factory.build_aggregate_populate_metadata(metadata: %{"traceparent" => "invalid-format"})
 
       :telemetry.execute([:commanded, :aggregate, :load, :start], %{}, meta)
 

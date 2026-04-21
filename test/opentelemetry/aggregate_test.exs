@@ -320,7 +320,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.causation_id": causation_id,
                "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "commanded.event.count": 0,
-               "error.type": "validation_failed"
+               "error.type": ":validation_failed"
              }
     end
 
@@ -356,7 +356,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                      1000
 
       assert status == {:status, :unset, ""}
-      assert :otel_attributes.map(span_attrs)[:"error.type"] == "validation_failed"
+      assert :otel_attributes.map(span_attrs)[:"error.type"] == ":validation_failed"
     end
 
     test "uses the formatted aggregate error message when callback returns error" do
@@ -424,7 +424,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.causation_id": context.causation_id,
                "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.ArgumentError"
+               "error.type": "ArgumentError"
              }
     end
 
@@ -470,7 +470,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "commanded.causation_id": context.causation_id,
                "commanded.registry.adapter": "Commanded.Registration.LocalRegistry",
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.RuntimeError"
+               "error.type": "RuntimeError"
              }
     end
   end

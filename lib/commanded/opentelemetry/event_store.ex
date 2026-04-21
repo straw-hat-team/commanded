@@ -13,16 +13,11 @@ defmodule Commanded.OpenTelemetry.EventStore do
   @tracer_id __MODULE__
 
   @events ~w(
-    ack_event
     append_to_stream
     delete_snapshot
-    delete_subscription
     read_snapshot
     record_snapshot
     stream_forward
-    subscribe
-    subscribe_to
-    unsubscribe
   )a
 
   def setup do
@@ -53,7 +48,7 @@ defmodule Commanded.OpenTelemetry.EventStore do
     action_name = to_string(action)
     {adapter, adapter_meta} = fetch_event_store_adapter(meta[:application])
     event_store_name = event_store_name(adapter_meta)
-    destination_name = to_destination_name(event_store_name)
+    destination_name = Helpers.to_destination_name(event_store_name)
     source_uuid = extract_source_uuid(meta)
     connection_config = lookup_connection_config(adapter, event_store_name)
 
@@ -65,14 +60,17 @@ defmodule Commanded.OpenTelemetry.EventStore do
         {CommandedAttributes.commanded_application(), meta[:application]}
       ]
       |> maybe_add_db_system(adapter)
-      |> maybe_add_operation_type(operation_type)
-      |> maybe_add_destination_name(destination_name)
-      |> maybe_add_stream_uuid(meta[:stream_uuid])
-      |> maybe_add_expected_version(meta[:expected_version])
-      |> maybe_add_subscription_name(meta[:subscription_name])
-      |> maybe_add_source_uuid(source_uuid)
+      |> Helpers.maybe_add_operation_type(operation_type)
+      |> Helpers.maybe_add_destination_name(destination_name)
+      |> Helpers.maybe_add_stream_uuid(meta[:stream_uuid])
+      |> Helpers.maybe_add_expected_version(meta[:expected_version])
+      |> Helpers.maybe_add_event_count(meta[:event_count])
+      |> Helpers.maybe_add_subscription_name(meta[:subscription_name])
+      |> Helpers.maybe_add_source_uuid(source_uuid)
       |> maybe_add_start_from(meta[:start_from])
-      |> Helpers.maybe_add_connection_attributes(connection_config, peer_service: destination_name)
+      |> maybe_add_start_version(meta[:start_version])
+      |> maybe_add_read_batch_size(meta[:read_batch_size])
+      |> Helpers.maybe_add_connection_attributes(connection_config)
 
     span_name =
       case destination_name do
@@ -143,55 +141,25 @@ defmodule Commanded.OpenTelemetry.EventStore do
 
   defp operation_type_for(:append_to_stream), do: :publish
   defp operation_type_for(:stream_forward), do: :receive
-  defp operation_type_for(:subscribe), do: :receive
-  defp operation_type_for(:subscribe_to), do: :receive
-  defp operation_type_for(:ack_event), do: :settle
   defp operation_type_for(:delete_snapshot), do: nil
-  defp operation_type_for(:delete_subscription), do: nil
   defp operation_type_for(:read_snapshot), do: :receive
   defp operation_type_for(:record_snapshot), do: :publish
-  defp operation_type_for(:unsubscribe), do: nil
   defp operation_type_for(_), do: nil
-
-  defp maybe_add_operation_type(attrs, nil), do: attrs
-
-  defp maybe_add_operation_type(attrs, type),
-    do: [{MessagingAttributes.messaging_operation_type(), type} | attrs]
-
-  defp maybe_add_destination_name(attrs, nil), do: attrs
-
-  defp maybe_add_destination_name(attrs, destination_name),
-    do: [{MessagingAttributes.messaging_destination_name(), destination_name} | attrs]
-
-  defp maybe_add_stream_uuid(attrs, nil), do: attrs
-
-  defp maybe_add_stream_uuid(attrs, stream_uuid),
-    do: [{CommandedAttributes.commanded_stream_uuid(), stream_uuid} | attrs]
-
-  defp maybe_add_expected_version(attrs, nil), do: attrs
-
-  defp maybe_add_expected_version(attrs, expected_version),
-    do: [{CommandedAttributes.commanded_expected_version(), expected_version} | attrs]
-
-  defp maybe_add_subscription_name(attrs, nil), do: attrs
-
-  defp maybe_add_subscription_name(attrs, name) do
-    [
-      {MessagingAttributes.messaging_destination_subscription_name(), name},
-      {CommandedAttributes.commanded_subscription_name(), name}
-      | attrs
-    ]
-  end
-
-  defp maybe_add_source_uuid(attrs, nil), do: attrs
-
-  defp maybe_add_source_uuid(attrs, source_uuid),
-    do: [{CommandedAttributes.commanded_source_uuid(), source_uuid} | attrs]
 
   defp maybe_add_start_from(attrs, nil), do: attrs
 
   defp maybe_add_start_from(attrs, start_from),
     do: [{CommandedAttributes.commanded_start_from(), to_start_from_attr(start_from)} | attrs]
+
+  defp maybe_add_start_version(attrs, nil), do: attrs
+
+  defp maybe_add_start_version(attrs, version),
+    do: [{CommandedAttributes.commanded_stream_start_version(), version} | attrs]
+
+  defp maybe_add_read_batch_size(attrs, nil), do: attrs
+
+  defp maybe_add_read_batch_size(attrs, size),
+    do: [{CommandedAttributes.commanded_stream_batch_size(), size} | attrs]
 
   # Extract source_uuid from metadata or nested snapshot struct (record_snapshot operation)
   defp extract_source_uuid(%{source_uuid: uuid}) when is_binary(uuid), do: uuid
@@ -241,11 +209,6 @@ defmodule Commanded.OpenTelemetry.EventStore do
     do: Map.get(adapter_meta, :name) || Map.get(adapter_meta, :event_store)
 
   defp event_store_name(_), do: nil
-
-  defp to_destination_name(nil), do: nil
-  defp to_destination_name(name) when is_binary(name), do: name
-  defp to_destination_name(name) when is_atom(name), do: inspect(name)
-  defp to_destination_name(_), do: nil
 
   defp to_start_from_attr(nil), do: nil
   defp to_start_from_attr(atom) when is_atom(atom), do: to_string(atom)
