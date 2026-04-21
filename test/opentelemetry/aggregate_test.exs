@@ -17,6 +17,32 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
   require OpenTelemetry.Tracer, as: Tracer
 
+  defmodule WrongExpectedVersionCommands do
+    defmodule Ok do
+      defstruct [:message]
+    end
+  end
+
+  defmodule WrongExpectedVersionEvent do
+    @derive Jason.Encoder
+    defstruct [:message]
+  end
+
+  defmodule WrongExpectedVersionAggregate do
+    alias Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionCommands.Ok
+    alias Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionEvent
+
+    defstruct [:message]
+
+    def execute(%__MODULE__{}, %Ok{message: message}) do
+      %WrongExpectedVersionEvent{message: message}
+    end
+
+    def apply(%__MODULE__{}, %WrongExpectedVersionEvent{message: message}) do
+      %__MODULE__{message: message}
+    end
+  end
+
   setup do
     start_supervised!(DefaultApp)
 
@@ -104,8 +130,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id,
                "messaging.message.conversation_id": correlation_id,
                "messaging.consumer.group.name": "MockApp",
-               "code.function": "execute",
-               "code.namespace": "Commanded.TestSupport.TestDomain.Account",
+               "code.function.name": "Commanded.TestSupport.TestDomain.Account.execute",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -153,8 +178,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id,
                "messaging.message.conversation_id": correlation_id,
                "messaging.consumer.group.name": "Commanded.DefaultApp",
-               "code.function": "handle",
-               "code.namespace": "Commanded.Middleware.Commands.CommandHandler",
+               "code.function.name": "Commanded.Middleware.Commands.CommandHandler.handle",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "Commanded.DefaultApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -216,8 +240,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id1,
                "messaging.message.conversation_id": correlation_id1,
                "messaging.consumer.group.name": "Commanded.DefaultApp",
-               "code.function": "handle",
-               "code.namespace": "Commanded.Middleware.Commands.CommandHandler",
+               "code.function.name": "Commanded.Middleware.Commands.CommandHandler.handle",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "Commanded.DefaultApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -250,8 +273,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id2,
                "messaging.message.conversation_id": correlation_id2,
                "messaging.consumer.group.name": "Commanded.DefaultApp",
-               "code.function": "handle",
-               "code.namespace": "Commanded.Middleware.Commands.CommandHandler",
+               "code.function.name": "Commanded.Middleware.Commands.CommandHandler.handle",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "Commanded.DefaultApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -309,8 +331,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id,
                "messaging.message.conversation_id": correlation_id,
                "messaging.consumer.group.name": "MockApp",
-               "code.function": "execute",
-               "code.namespace": "Commanded.TestSupport.TestDomain.Account",
+               "code.function.name": "Commanded.TestSupport.TestDomain.Account.execute",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -413,8 +434,8 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": context.causation_id,
                "messaging.message.conversation_id": context.correlation_id,
                "messaging.consumer.group.name": inspect(meta.application),
-               "code.function": to_string(context.function),
-               "code.namespace": "Commanded.TestSupport.TestDomain.Account",
+               "code.function.name":
+                 "Commanded.TestSupport.TestDomain.Account.#{to_string(context.function)}",
                "commanded.handler.kind": "aggregate",
                "commanded.application": inspect(meta.application),
                "commanded.aggregate.uuid": meta.aggregate_uuid,
@@ -459,8 +480,8 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": context.causation_id,
                "messaging.message.conversation_id": context.correlation_id,
                "messaging.consumer.group.name": inspect(meta.application),
-               "code.function": to_string(context.function),
-               "code.namespace": "Commanded.TestSupport.TestDomain.Account",
+               "code.function.name":
+                 "Commanded.TestSupport.TestDomain.Account.#{to_string(context.function)}",
                "commanded.handler.kind": "aggregate",
                "commanded.application": inspect(meta.application),
                "commanded.aggregate.uuid": meta.aggregate_uuid,
@@ -652,8 +673,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
                "messaging.message.id": causation_id,
                "messaging.message.conversation_id": correlation_id,
                "messaging.consumer.group.name": "MockApp",
-               "code.function": "execute",
-               "code.namespace": "Commanded.TestSupport.TestDomain.Account",
+               "code.function.name": "Commanded.TestSupport.TestDomain.Account.execute",
                "commanded.handler.kind": "aggregate",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
@@ -673,20 +693,24 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
       expect_wrong_expected_version_conflict(aggregate_uuid)
 
-      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+      assert {:ok, _pid} =
+               start_aggregate(aggregate_uuid,
+                 application: MockedApp,
+                 aggregate: WrongExpectedVersionAggregate
+               )
 
       assert {:error, :too_many_attempts} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 WrongExpectedVersionAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(WrongExpectedVersionCommands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   handler: WrongExpectedVersionAggregate,
                    retry_attempts: 0
                  }
                )
@@ -694,7 +718,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -727,26 +751,30 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
         build_recorded_event(
           aggregate_uuid,
           1,
-          struct!(Commanded.Aggregates.AggregateTelemetryTest.Event, message: "event"),
-          event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event"
+          struct!(WrongExpectedVersionEvent, message: "event"),
+          event_type: "Elixir.Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionEvent"
         )
 
       expect_wrong_expected_version_retry_succeeds(aggregate_uuid, event)
 
-      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+      assert {:ok, _pid} =
+               start_aggregate(aggregate_uuid,
+                 application: MockedApp,
+                 aggregate: WrongExpectedVersionAggregate
+               )
 
       assert {:ok, 2, _events, _aggregate_state} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 WrongExpectedVersionAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(WrongExpectedVersionCommands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   handler: WrongExpectedVersionAggregate,
                    retry_attempts: 1
                  }
                )
@@ -754,7 +782,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -783,27 +811,31 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
 
       expect_successful_append_with_empty_stream(aggregate_uuid)
 
-      assert {:ok, _pid} = start_aggregate(aggregate_uuid, application: MockedApp)
+      assert {:ok, _pid} =
+               start_aggregate(aggregate_uuid,
+                 application: MockedApp,
+                 aggregate: WrongExpectedVersionAggregate
+               )
 
       assert {:ok, 1, _events, _aggregate_state} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 WrongExpectedVersionAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(WrongExpectedVersionCommands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate
+                   handler: WrongExpectedVersionAggregate
                  }
                )
 
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.OpenTelemetry.AggregateTest.WrongExpectedVersionAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -822,7 +854,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   end
 
   defp start_aggregate(aggregate_uuid, opts) do
-    aggregate = AggregateTelemetryTest.ExampleAggregate
+    aggregate = Keyword.get(opts, :aggregate, AggregateTelemetryTest.ExampleAggregate)
     app = Keyword.fetch!(opts, :application)
     name = Aggregate.name(app, aggregate, aggregate_uuid)
 

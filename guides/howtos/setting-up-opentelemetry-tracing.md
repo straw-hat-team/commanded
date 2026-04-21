@@ -61,6 +61,55 @@ Note: `setup/1` should only be called once during application startup.
 Commanded.OpenTelemetry.setup(event_handler: :disabled)
 ```
 
+## SemConv Compatibility Modes
+
+Commanded ships with mixed SemConv compatibility behavior:
+
+- code attributes always use stable `code.function.name`
+- messaging spans keep legacy behavior by default
+- event store spans keep legacy database behavior by default
+- exception recording stays on span events only
+
+You can opt into the newer OpenTelemetry semantic conventions with the standard
+environment variables before your application starts:
+
+```bash
+# Use stable messaging conventions where Commanded supports them
+export OTEL_SEMCONV_STABILITY_OPT_IN=messaging
+
+# Use stable database conventions for event store spans
+export OTEL_SEMCONV_STABILITY_OPT_IN=database
+
+# Enable both during migration
+export OTEL_SEMCONV_STABILITY_OPT_IN=messaging,database
+
+# Duplicate-emission modes are also supported where the spec recommends them
+export OTEL_SEMCONV_STABILITY_OPT_IN=messaging/dup,database/dup
+```
+
+When `messaging` is enabled:
+
+- event handler spans use stable messaging operation types like `process`
+- application and aggregate execution spans stop modeling themselves as messaging
+  spans and become internal spans instead
+- aggregate load and snapshot helper spans also drop their legacy messaging
+  attributes
+
+When `database` is enabled:
+
+- event store spans emit stable database attrs like `db.system.name` and
+  `db.operation.name`
+- legacy attrs like `db.system` are no longer emitted unless `database/dup` is
+  enabled
+
+## Exception Signal SemConv
+
+Commanded continues recording exceptions as span events.
+
+`OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN` is currently not implemented for
+Commanded's instrumentation. If you set it, Commanded emits a warning and keeps
+the existing span-event behavior.
+
 ## Override Returned Error Status
 
 You can override the span status used for returned `:stop` errors on application

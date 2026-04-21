@@ -111,6 +111,8 @@ defmodule Commanded.OpenTelemetry.Helpers do
   def struct_name(%name{}), do: inspect(name)
   def struct_name(_), do: nil
 
+  def compact_attrs(attrs), do: Enum.reject(attrs, &is_nil/1)
+
   def maybe_add_connection_attributes(attrs, [_ | _] = config) do
     attrs
     |> maybe_add_attr(ServerAttributes.server_address(), config[:hostname])
@@ -123,6 +125,9 @@ defmodule Commanded.OpenTelemetry.Helpers do
 
   def maybe_add_attr(attrs, _key, nil), do: attrs
   def maybe_add_attr(attrs, key, value), do: [{key, value} | attrs]
+
+  def maybe_attr(_key, nil), do: nil
+  def maybe_attr(key, value), do: {key, value}
 
   def maybe_add_operation_type(attrs, nil), do: attrs
 

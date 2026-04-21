@@ -3,8 +3,8 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
 
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
+  alias Commanded.OpenTelemetry.SemConv
   alias OpenTelemetry.SemConv.ErrorAttributes
-  alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
 
@@ -34,16 +34,15 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
 
     attributes =
       [
-        {MessagingAttributes.messaging_system(), "commanded"},
-        {MessagingAttributes.messaging_operation_type(), :publish},
-        {MessagingAttributes.messaging_operation_name(), "snapshot"},
-        {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
-        {CodeAttributes.code_function(), "snapshot"},
-        {CodeAttributes.code_namespace(), aggregate_module_name},
+        legacy_messaging_attrs(aggregate_module_name),
+        {SemConv.code_function_name_key(),
+         SemConv.code_function_name(Commanded.Aggregates.Aggregate, :do_take_snapshot)},
         {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
         {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
         {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
       ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
       |> maybe_add_snapshot_every(meta[:snapshot_every])
       |> maybe_add_snapshot_module_version(meta[:snapshot_module_version])
 
@@ -122,4 +121,18 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshot do
   end
 
   defp maybe_add_snapshot_module_version(attrs, _), do: attrs
+
+  defp legacy_messaging_attrs(aggregate_module_name) do
+    if SemConv.legacy_messaging?() do
+      [
+        {MessagingAttributes.messaging_system(), "commanded"},
+        {MessagingAttributes.messaging_operation_type(),
+         SemConv.legacy_messaging_operation_type(:send)},
+        {MessagingAttributes.messaging_operation_name(), "snapshot"},
+        {MessagingAttributes.messaging_destination_name(), aggregate_module_name}
+      ]
+    else
+      []
+    end
+  end
 end

@@ -3,7 +3,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
 
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
-  alias OpenTelemetry.SemConv.Incubating.CodeAttributes
+  alias Commanded.OpenTelemetry.SemConv
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
 
@@ -37,17 +37,20 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
 
     aggregate_module_name = Helpers.module_name(meta.aggregate_module)
 
-    attributes = [
-      {MessagingAttributes.messaging_system(), "commanded"},
-      {MessagingAttributes.messaging_operation_type(), :receive},
-      {MessagingAttributes.messaging_operation_name(), "load"},
-      {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
-      {CodeAttributes.code_function(), "load"},
-      {CodeAttributes.code_namespace(), aggregate_module_name},
-      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
-      {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
-      {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
-    ]
+    attributes =
+      [
+        legacy_messaging_attrs("load", aggregate_module_name),
+        {SemConv.code_function_name_key(),
+         SemConv.code_function_name(
+           Commanded.Aggregates.AggregateStateBuilder,
+           :rebuild_from_events
+         )},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
+        {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
+        {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
+      ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
@@ -102,20 +105,20 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
       ) do
     aggregate_module_name = Helpers.module_name(meta.aggregate_module)
 
-    attributes = [
-      # OTel Messaging SemConv
-      {MessagingAttributes.messaging_system(), "commanded"},
-      {MessagingAttributes.messaging_operation_type(), :receive},
-      {MessagingAttributes.messaging_operation_name(), "populate"},
-      {MessagingAttributes.messaging_destination_name(), aggregate_module_name},
-      # OTel Code SemConv
-      {CodeAttributes.code_function(), "populate"},
-      {CodeAttributes.code_namespace(), aggregate_module_name},
-      # Commanded-specific
-      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
-      {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
-      {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
-    ]
+    attributes =
+      [
+        legacy_messaging_attrs("populate", aggregate_module_name),
+        {SemConv.code_function_name_key(),
+         SemConv.code_function_name(
+           Commanded.Aggregates.AggregateStateBuilder,
+           :rebuild_from_event_stream
+         )},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
+        {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
+        {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version}
+      ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
@@ -146,5 +149,19 @@ defmodule Commanded.OpenTelemetry.AggregatePopulate do
     )
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
+  end
+
+  defp legacy_messaging_attrs(operation_name, aggregate_module_name) do
+    if SemConv.legacy_messaging?() do
+      [
+        {MessagingAttributes.messaging_system(), "commanded"},
+        {MessagingAttributes.messaging_operation_type(),
+         SemConv.legacy_messaging_operation_type(:receive)},
+        {MessagingAttributes.messaging_operation_name(), operation_name},
+        {MessagingAttributes.messaging_destination_name(), aggregate_module_name}
+      ]
+    else
+      []
+    end
   end
 end

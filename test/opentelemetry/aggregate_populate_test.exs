@@ -88,8 +88,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
                "messaging.destination.name": "MockAggregate",
-               "code.function": "populate",
-               "code.namespace": "MockAggregate",
+               "code.function.name":
+                 "Commanded.Aggregates.AggregateStateBuilder.rebuild_from_event_stream",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 5,
@@ -138,8 +138,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.operation.type": :receive,
                "messaging.operation.name": "load",
                "messaging.destination.name": "MockAggregate",
-               "code.function": "load",
-               "code.namespace": "MockAggregate",
+               "code.function.name":
+                 "Commanded.Aggregates.AggregateStateBuilder.rebuild_from_events",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
@@ -215,8 +215,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
                "messaging.destination.name": "MockAggregate",
-               "code.function": "populate",
-               "code.namespace": "MockAggregate",
+               "code.function.name":
+                 "Commanded.Aggregates.AggregateStateBuilder.rebuild_from_event_stream",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 0,
@@ -251,8 +251,8 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
                "messaging.operation.type": :receive,
                "messaging.operation.name": "populate",
                "messaging.destination.name": "MockAggregate",
-               "code.function": "populate",
-               "code.namespace": "MockAggregate",
+               "code.function.name":
+                 "Commanded.Aggregates.AggregateStateBuilder.rebuild_from_event_stream",
                "commanded.application": "MockApp",
                "commanded.aggregate.uuid": aggregate_uuid,
                "commanded.aggregate.version": 10,

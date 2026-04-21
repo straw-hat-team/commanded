@@ -3,8 +3,8 @@ defmodule Commanded.OpenTelemetry.Aggregate do
 
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
+  alias Commanded.OpenTelemetry.SemConv
   alias OpenTelemetry.SemConv.ErrorAttributes
-  alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
 
@@ -39,29 +39,25 @@ defmodule Commanded.OpenTelemetry.Aggregate do
 
     handler_module_name = Helpers.module_name(context.handler)
 
-    attributes = [
-      # OTel Messaging SemConv
-      {MessagingAttributes.messaging_system(), "commanded"},
-      {MessagingAttributes.messaging_operation_type(), :process},
-      {MessagingAttributes.messaging_operation_name(), "execute"},
-      {MessagingAttributes.messaging_destination_name(), handler_module_name},
-      {MessagingAttributes.messaging_message_id(), context.causation_id},
-      {MessagingAttributes.messaging_message_conversation_id(), context.correlation_id},
-      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
-      # OTel Code SemConv
-      {CodeAttributes.code_function(), to_string(context.function)},
-      {CodeAttributes.code_namespace(), handler_module_name},
-      # Commanded-specific
-      {CommandedAttributes.commanded_handler_kind(), "aggregate"},
-      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
-      {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
-      {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version},
-      {CommandedAttributes.commanded_command(), Helpers.struct_name(context.command)},
-      {CommandedAttributes.commanded_correlation_id(), context.correlation_id},
-      {CommandedAttributes.commanded_causation_id(), context.causation_id},
-      {CommandedAttributes.commanded_registry_adapter(),
-       Helpers.module_name(meta.registry_adapter)}
-    ]
+    attributes =
+      [
+        legacy_messaging_attrs(context, handler_module_name, meta),
+        Helpers.maybe_attr(
+          SemConv.code_function_name_key(),
+          SemConv.code_function_name(context.handler, context.function)
+        ),
+        {CommandedAttributes.commanded_handler_kind(), "aggregate"},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
+        {CommandedAttributes.commanded_aggregate_uuid(), meta.aggregate_uuid},
+        {CommandedAttributes.commanded_aggregate_version(), meta.aggregate_version},
+        {CommandedAttributes.commanded_command(), Helpers.struct_name(context.command)},
+        {CommandedAttributes.commanded_correlation_id(), context.correlation_id},
+        {CommandedAttributes.commanded_causation_id(), context.causation_id},
+        {CommandedAttributes.commanded_registry_adapter(),
+         Helpers.module_name(meta.registry_adapter)}
+      ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
 
     # OTel semconv: span name = "{operation.name} {destination.name}"
     span_name = "execute #{handler_module_name}"
@@ -71,7 +67,7 @@ defmodule Commanded.OpenTelemetry.Aggregate do
       span_name,
       meta,
       %{
-        kind: :consumer,
+        kind: span_kind(),
         attributes: attributes
       }
     )
@@ -141,5 +137,27 @@ defmodule Commanded.OpenTelemetry.Aggregate do
     )
 
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
+  end
+
+  defp legacy_messaging_attrs(context, handler_module_name, meta) do
+    if SemConv.legacy_messaging?() do
+      [
+        {MessagingAttributes.messaging_system(), "commanded"},
+        {MessagingAttributes.messaging_operation_type(),
+         SemConv.legacy_messaging_operation_type(:process)},
+        {MessagingAttributes.messaging_operation_name(), "execute"},
+        {MessagingAttributes.messaging_destination_name(), handler_module_name},
+        {MessagingAttributes.messaging_message_id(), context.causation_id},
+        {MessagingAttributes.messaging_message_conversation_id(), context.correlation_id},
+        {MessagingAttributes.messaging_consumer_group_name(),
+         Helpers.module_name(meta.application)}
+      ]
+    else
+      []
+    end
+  end
+
+  defp span_kind do
+    if SemConv.stable_messaging?(), do: :internal, else: :consumer
   end
 end

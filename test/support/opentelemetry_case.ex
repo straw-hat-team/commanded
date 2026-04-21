@@ -25,6 +25,14 @@ defmodule Commanded.OpenTelemetryCase do
   end
 
   setup do
+    semconv_env = %{
+      "OTEL_SEMCONV_STABILITY_OPT_IN" => System.get_env("OTEL_SEMCONV_STABILITY_OPT_IN"),
+      "OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN" =>
+        System.get_env("OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN")
+    }
+
+    clear_semconv_env()
+
     :application.stop(:opentelemetry)
     :application.set_env(:opentelemetry, :tracer, :otel_tracer_default)
 
@@ -36,6 +44,8 @@ defmodule Commanded.OpenTelemetryCase do
     :otel_batch_processor.set_exporter(:otel_exporter_pid, self())
 
     on_exit(fn ->
+      restore_semconv_env(semconv_env)
+
       commanded_events = [
         [:commanded, :event, :handle, :start],
         [:commanded, :event, :handle, :stop],
@@ -65,5 +75,33 @@ defmodule Commanded.OpenTelemetryCase do
     end)
 
     :ok
+  end
+
+  def put_semconv_stability_opt_in(value) when is_binary(value) do
+    System.put_env("OTEL_SEMCONV_STABILITY_OPT_IN", value)
+  end
+
+  def put_semconv_stability_opt_in(nil) do
+    System.delete_env("OTEL_SEMCONV_STABILITY_OPT_IN")
+  end
+
+  def put_exception_signal_opt_in(value) when is_binary(value) do
+    System.put_env("OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN", value)
+  end
+
+  def put_exception_signal_opt_in(nil) do
+    System.delete_env("OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN")
+  end
+
+  defp clear_semconv_env do
+    System.delete_env("OTEL_SEMCONV_STABILITY_OPT_IN")
+    System.delete_env("OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN")
+  end
+
+  defp restore_semconv_env(env) do
+    Enum.each(env, fn
+      {name, nil} -> System.delete_env(name)
+      {name, value} -> System.put_env(name, value)
+    end)
   end
 end

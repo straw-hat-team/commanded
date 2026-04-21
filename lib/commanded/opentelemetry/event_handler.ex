@@ -3,8 +3,8 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
+  alias Commanded.OpenTelemetry.SemConv
   alias OpenTelemetry.SemConv.ErrorAttributes
-  alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
   alias OpenTelemetry.Span
 
@@ -72,30 +72,28 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
     handler_module_name = Helpers.module_name(meta.handler_module)
 
-    attributes = [
-      # OTel Messaging SemConv
-      {MessagingAttributes.messaging_system(), "commanded"},
-      {MessagingAttributes.messaging_operation_type(), :receive},
-      {MessagingAttributes.messaging_operation_name(), "handle"},
-      {MessagingAttributes.messaging_destination_name(), handler_module_name},
-      {MessagingAttributes.messaging_destination_subscription_name(), meta.handler_name},
-      {MessagingAttributes.messaging_message_id(), recorded_event.event_id},
-      {MessagingAttributes.messaging_message_conversation_id(), recorded_event.correlation_id},
-      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
-      # OTel Code SemConv
-      {CodeAttributes.code_function(), "handle"},
-      {CodeAttributes.code_namespace(), handler_module_name},
-      # Commanded-specific
-      {CommandedAttributes.commanded_handler_kind(), "event_handler"},
-      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
-      {CommandedAttributes.commanded_handler_name(), meta.handler_name},
-      {CommandedAttributes.commanded_event(), recorded_event.event_type},
-      {CommandedAttributes.commanded_event_number(), recorded_event.event_number},
-      {CommandedAttributes.commanded_correlation_id(), recorded_event.correlation_id},
-      {CommandedAttributes.commanded_causation_id(), recorded_event.causation_id},
-      {CommandedAttributes.commanded_stream_id(), recorded_event.stream_id},
-      {CommandedAttributes.commanded_stream_version(), recorded_event.stream_version}
-    ]
+    attributes =
+      [
+        handle_messaging_attrs(
+          handler_module_name,
+          meta.handler_name,
+          Helpers.module_name(meta.application),
+          recorded_event
+        ),
+        {SemConv.code_function_name_key(),
+         SemConv.code_function_name(meta.handler_module, :handle)},
+        {CommandedAttributes.commanded_handler_kind(), "event_handler"},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
+        {CommandedAttributes.commanded_handler_name(), meta.handler_name},
+        {CommandedAttributes.commanded_event(), recorded_event.event_type},
+        {CommandedAttributes.commanded_event_number(), recorded_event.event_number},
+        {CommandedAttributes.commanded_correlation_id(), recorded_event.correlation_id},
+        {CommandedAttributes.commanded_causation_id(), recorded_event.causation_id},
+        {CommandedAttributes.commanded_stream_id(), recorded_event.stream_id},
+        {CommandedAttributes.commanded_stream_version(), recorded_event.stream_version}
+      ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
 
     # TODO: Add consistency attribute when available in telemetry metadata
     # consistency: meta.consistency
@@ -177,26 +175,25 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
     handler_module_name = Helpers.module_name(meta.handler_module)
 
-    attributes = [
-      # OTel Messaging SemConv
-      {MessagingAttributes.messaging_system(), "commanded"},
-      {MessagingAttributes.messaging_operation_type(), :receive},
-      {MessagingAttributes.messaging_operation_name(), "batch"},
-      {MessagingAttributes.messaging_destination_name(), handler_module_name},
-      {MessagingAttributes.messaging_destination_subscription_name(), meta.handler_name},
-      {MessagingAttributes.messaging_consumer_group_name(), Helpers.module_name(meta.application)},
-      {MessagingAttributes.messaging_batch_message_count(), meta.event_count},
-      # OTel Code SemConv
-      {CodeAttributes.code_function(), "handle_batch"},
-      {CodeAttributes.code_namespace(), handler_module_name},
-      # Commanded-specific
-      {CommandedAttributes.commanded_handler_kind(), "event_handler"},
-      {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
-      {CommandedAttributes.commanded_handler_name(), meta.handler_name},
-      {CommandedAttributes.commanded_event_count(), meta.event_count},
-      {CommandedAttributes.commanded_batch_first_event_id(), meta.first_event_id},
-      {CommandedAttributes.commanded_batch_last_event_id(), meta.last_event_id}
-    ]
+    attributes =
+      [
+        batch_messaging_attrs(
+          handler_module_name,
+          meta.handler_name,
+          Helpers.module_name(meta.application),
+          meta.event_count
+        ),
+        {SemConv.code_function_name_key(),
+         SemConv.code_function_name(meta.handler_module, :handle_batch)},
+        {CommandedAttributes.commanded_handler_kind(), "event_handler"},
+        {CommandedAttributes.commanded_application(), Helpers.module_name(meta.application)},
+        {CommandedAttributes.commanded_handler_name(), meta.handler_name},
+        {CommandedAttributes.commanded_event_count(), meta.event_count},
+        {CommandedAttributes.commanded_batch_first_event_id(), meta.first_event_id},
+        {CommandedAttributes.commanded_batch_last_event_id(), meta.last_event_id}
+      ]
+      |> List.flatten()
+      |> Helpers.compact_attrs()
 
     span_opts = %{kind: :consumer, attributes: attributes}
 
@@ -267,4 +264,57 @@ defmodule Commanded.OpenTelemetry.EventHandler do
 
   defp put_links(span_opts, []), do: span_opts
   defp put_links(span_opts, links), do: Map.put(span_opts, :links, links)
+
+  defp handle_messaging_attrs(handler_module_name, handler_name, application_name, recorded_event) do
+    operation_type =
+      if SemConv.stable_messaging?() do
+        SemConv.stable_messaging_operation_type(:process)
+      else
+        SemConv.legacy_messaging_operation_type(:receive)
+      end
+
+    [
+      {MessagingAttributes.messaging_system(), "commanded"},
+      {MessagingAttributes.messaging_operation_type(), operation_type},
+      {MessagingAttributes.messaging_operation_name(), "handle"},
+      if(SemConv.legacy_messaging?(),
+        do:
+          Helpers.maybe_attr(
+            MessagingAttributes.messaging_destination_name(),
+            handler_module_name
+          )
+      ),
+      {MessagingAttributes.messaging_destination_subscription_name(), handler_name},
+      {MessagingAttributes.messaging_message_id(), recorded_event.event_id},
+      {MessagingAttributes.messaging_message_conversation_id(), recorded_event.correlation_id},
+      {MessagingAttributes.messaging_consumer_group_name(), application_name}
+    ]
+    |> Helpers.compact_attrs()
+  end
+
+  defp batch_messaging_attrs(handler_module_name, handler_name, application_name, event_count) do
+    operation_type =
+      if SemConv.stable_messaging?() do
+        SemConv.stable_messaging_operation_type(:process)
+      else
+        SemConv.legacy_messaging_operation_type(:receive)
+      end
+
+    [
+      {MessagingAttributes.messaging_system(), "commanded"},
+      {MessagingAttributes.messaging_operation_type(), operation_type},
+      {MessagingAttributes.messaging_operation_name(), "batch"},
+      if(SemConv.legacy_messaging?(),
+        do:
+          Helpers.maybe_attr(
+            MessagingAttributes.messaging_destination_name(),
+            handler_module_name
+          )
+      ),
+      {MessagingAttributes.messaging_destination_subscription_name(), handler_name},
+      {MessagingAttributes.messaging_consumer_group_name(), application_name},
+      {MessagingAttributes.messaging_batch_message_count(), event_count}
+    ]
+    |> Helpers.compact_attrs()
+  end
 end

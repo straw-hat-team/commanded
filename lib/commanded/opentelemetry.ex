@@ -31,6 +31,24 @@ defmodule Commanded.OpenTelemetry do
         # ... your command routes
       end
 
+  ## SemConv Compatibility
+
+  Commanded keeps legacy messaging and database conventions by default where the
+  OpenTelemetry spec recommends an opt-in migration path.
+
+  The instrumentation supports `OTEL_SEMCONV_STABILITY_OPT_IN` for:
+
+  * `messaging`
+  * `messaging/dup`
+  * `database`
+  * `database/dup`
+
+  Code attributes are emitted as stable `code.function.name`
+  unconditionally.
+
+  Commanded does not currently support `OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN`.
+  Exceptions continue to be recorded as span events.
+
   ## Types
 
   See `t:span_relationship/0` for available span relationship modes.
@@ -42,6 +60,7 @@ defmodule Commanded.OpenTelemetry do
   alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler
   alias Commanded.OpenTelemetry.EventStore
+  alias Commanded.OpenTelemetry.SemConv
 
   @typedoc """
   Determines how event handler spans relate to command dispatch spans.
@@ -181,6 +200,7 @@ defmodule Commanded.OpenTelemetry do
   @spec setup(keyword()) :: :ok
   def setup(opts \\ []) do
     opts = NimbleOptions.validate!(opts, @nimble_schema)
+    maybe_warn_unsupported_exception_signal_opt_in()
 
     case opts[:aggregate] do
       :disabled -> :ok
@@ -213,5 +233,20 @@ defmodule Commanded.OpenTelemetry do
     end
 
     :ok
+  end
+
+  defp maybe_warn_unsupported_exception_signal_opt_in do
+    if SemConv.unsupported_exception_signal_opt_in?() do
+      :telemetry.execute(
+        [:commanded, :opentelemetry, :warning],
+        %{count: 1},
+        %{
+          message:
+            "OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN is not supported; Commanded continues recording exceptions as span events",
+          requested_opt_in: System.get_env("OTEL_SEMCONV_EXCEPTION_SIGNAL_OPT_IN"),
+          tracer_id: __MODULE__
+        }
+      )
+    end
   end
 end

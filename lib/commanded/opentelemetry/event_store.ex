@@ -4,10 +4,11 @@ defmodule Commanded.OpenTelemetry.EventStore do
   alias Commanded.Application, as: CommandedApplication
   alias Commanded.OpenTelemetry.CommandedAttributes
   alias Commanded.OpenTelemetry.Helpers
+  alias Commanded.OpenTelemetry.SemConv
   alias OpenTelemetry.SemConv.ErrorAttributes
-  alias OpenTelemetry.SemConv.Incubating.CodeAttributes
   alias OpenTelemetry.SemConv.Incubating.DBAttributes
   alias OpenTelemetry.SemConv.Incubating.MessagingAttributes
+  alias OpenTelemetry.SemConv.ServerAttributes
   alias OpenTelemetry.Span
 
   @tracer_id __MODULE__
@@ -44,39 +45,34 @@ defmodule Commanded.OpenTelemetry.EventStore do
         meta,
         _config
       ) do
-    operation_type = operation_type_for(action)
     action_name = to_string(action)
     {adapter, adapter_meta} = fetch_event_store_adapter(meta[:application])
     event_store_name = event_store_name(adapter_meta)
     destination_name = Helpers.to_destination_name(event_store_name)
     source_uuid = extract_source_uuid(meta)
     connection_config = lookup_connection_config(adapter, event_store_name)
+    db_namespace = database_namespace(connection_config, destination_name)
+    span_target = span_target(connection_config, db_namespace, destination_name)
 
     attributes =
       [
-        {MessagingAttributes.messaging_system(), "commanded"},
-        {MessagingAttributes.messaging_operation_name(), action_name},
-        {CodeAttributes.code_function(), action_name},
+        legacy_database_attrs(action, action_name, destination_name, adapter),
+        stable_database_attrs(action_name, connection_config, db_namespace, adapter),
+        {SemConv.code_function_name_key(), SemConv.event_store_code_function_name(action)},
         {CommandedAttributes.commanded_application(), Helpers.module_name(meta[:application])}
       ]
-      |> maybe_add_db_system(adapter)
-      |> Helpers.maybe_add_operation_type(operation_type)
-      |> Helpers.maybe_add_destination_name(destination_name)
+      |> List.flatten()
+      |> Helpers.compact_attrs()
       |> Helpers.maybe_add_stream_uuid(meta[:stream_uuid])
       |> Helpers.maybe_add_expected_version(meta[:expected_version])
       |> Helpers.maybe_add_event_count(meta[:event_count])
-      |> Helpers.maybe_add_subscription_name(meta[:subscription_name])
       |> Helpers.maybe_add_source_uuid(source_uuid)
       |> maybe_add_start_from(meta[:start_from])
       |> maybe_add_start_version(meta[:start_version])
       |> maybe_add_read_batch_size(meta[:read_batch_size])
-      |> Helpers.maybe_add_connection_attributes(connection_config)
+      |> maybe_add_connection_attrs(connection_config)
 
-    span_name =
-      case destination_name do
-        nil -> action_name
-        name -> "#{action_name} #{name}"
-      end
+    span_name = span_name(action_name, span_target)
 
     OpentelemetryTelemetry.start_telemetry_span(
       @tracer_id,
@@ -139,12 +135,81 @@ defmodule Commanded.OpenTelemetry.EventStore do
     OpentelemetryTelemetry.end_telemetry_span(@tracer_id, meta)
   end
 
-  defp operation_type_for(:append_to_stream), do: :publish
-  defp operation_type_for(:stream_forward), do: :receive
-  defp operation_type_for(:delete_snapshot), do: nil
-  defp operation_type_for(:read_snapshot), do: :receive
-  defp operation_type_for(:record_snapshot), do: :publish
-  defp operation_type_for(_), do: nil
+  defp legacy_database_attrs(action, action_name, destination_name, adapter) do
+    identifiers = SemConv.database_system_identifiers(adapter)
+
+    if SemConv.legacy_database?() do
+      [
+        {MessagingAttributes.messaging_system(), "commanded"},
+        {MessagingAttributes.messaging_operation_name(), action_name},
+        maybe_legacy_operation_type(action),
+        Helpers.maybe_attr(MessagingAttributes.messaging_destination_name(), destination_name),
+        Helpers.maybe_attr(
+          OpenTelemetry.SemConv.Incubating.DBAttributes.db_system(),
+          identifiers.legacy
+        )
+      ]
+    else
+      []
+    end
+  end
+
+  defp stable_database_attrs(action_name, _connection_config, db_namespace, adapter) do
+    identifiers = SemConv.database_system_identifiers(adapter)
+
+    if SemConv.stable_database?() do
+      [
+        Helpers.maybe_attr(SemConv.db_system_name_key(), identifiers.stable),
+        {DBAttributes.db_operation_name(), action_name},
+        Helpers.maybe_attr(DBAttributes.db_namespace(), db_namespace)
+      ]
+    else
+      []
+    end
+  end
+
+  defp maybe_add_connection_attrs(attrs, [_ | _] = connection_config) do
+    attrs
+    |> Helpers.maybe_add_attr(ServerAttributes.server_address(), connection_config[:hostname])
+    |> Helpers.maybe_add_attr(ServerAttributes.server_port(), connection_config[:port])
+    |> maybe_add_peer_service(connection_config)
+  end
+
+  defp maybe_add_connection_attrs(attrs, _connection_config), do: attrs
+
+  defp maybe_add_peer_service(attrs, connection_config) do
+    if SemConv.legacy_database?() do
+      Helpers.maybe_add_attr(
+        attrs,
+        OpenTelemetry.SemConv.Incubating.PeerAttributes.peer_service(),
+        connection_config[:database]
+      )
+    else
+      attrs
+    end
+  end
+
+  defp maybe_legacy_operation_type(:append_to_stream) do
+    {MessagingAttributes.messaging_operation_type(),
+     SemConv.legacy_messaging_operation_type(:send)}
+  end
+
+  defp maybe_legacy_operation_type(:record_snapshot) do
+    {MessagingAttributes.messaging_operation_type(),
+     SemConv.legacy_messaging_operation_type(:send)}
+  end
+
+  defp maybe_legacy_operation_type(:stream_forward) do
+    {MessagingAttributes.messaging_operation_type(),
+     SemConv.legacy_messaging_operation_type(:receive)}
+  end
+
+  defp maybe_legacy_operation_type(:read_snapshot) do
+    {MessagingAttributes.messaging_operation_type(),
+     SemConv.legacy_messaging_operation_type(:receive)}
+  end
+
+  defp maybe_legacy_operation_type(_), do: nil
 
   defp maybe_add_start_from(attrs, nil), do: attrs
 
@@ -166,16 +231,31 @@ defmodule Commanded.OpenTelemetry.EventStore do
   defp extract_source_uuid(%{snapshot: %{source_uuid: uuid}}) when is_binary(uuid), do: uuid
   defp extract_source_uuid(_), do: nil
 
-  defp maybe_add_db_system(attrs, adapter) do
-    case db_system_for(adapter) do
-      nil -> attrs
-      system -> [{DBAttributes.db_system(), system} | attrs]
+  defp database_namespace([_ | _] = connection_config, destination_name) do
+    connection_config[:database] || destination_name
+  end
+
+  defp database_namespace(_connection_config, _destination_name), do: nil
+
+  defp span_target([_ | _] = connection_config, db_namespace, destination_name) do
+    cond do
+      db_namespace ->
+        db_namespace
+
+      connection_config[:hostname] && connection_config[:port] ->
+        "#{connection_config[:hostname]}:#{connection_config[:port]}"
+
+      true ->
+        destination_name
     end
   end
 
-  defp db_system_for(Commanded.EventStore.Adapters.EventStore), do: :postgresql
-  defp db_system_for(Commanded.EventStore.Adapters.InMemory), do: :in_memory
-  defp db_system_for(_), do: nil
+  defp span_target(_connection_config, db_namespace, destination_name) do
+    db_namespace || destination_name
+  end
+
+  defp span_name(action_name, nil), do: action_name
+  defp span_name(action_name, target), do: "#{action_name} #{target}"
 
   defp lookup_connection_config(Commanded.EventStore.Adapters.EventStore, event_store_name)
        when is_atom(event_store_name) and not is_nil(event_store_name) do
