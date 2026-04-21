@@ -230,7 +230,7 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
                "commanded.command": "Commanded.TestSupport.TestDomain.OpenAccount",
                "commanded.correlation_id": correlation_id,
                "commanded.causation_id": causation_id,
-               "error.type": "validation_failed"
+               "error.type": ":validation_failed"
              }
     end
 
@@ -281,7 +281,7 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
       assert callback_meta.error == :validation_failed
       assert is_function(Keyword.fetch!(callback_config, :error_status), 4)
       assert status == {:status, :unset, ""}
-      assert :otel_attributes.map(span_attrs)[:"error.type"] == "validation_failed"
+      assert :otel_attributes.map(span_attrs)[:"error.type"] == ":validation_failed"
     end
 
     test "uses the formatted error message when callback returns error" do
@@ -374,7 +374,7 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
                "commanded.correlation_id": context.correlation_id,
                "commanded.causation_id": context.causation_id,
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.ArgumentError"
+               "error.type": "ArgumentError"
              }
     end
 
@@ -419,7 +419,7 @@ defmodule Commanded.OpenTelemetry.ApplicationTest do
                "commanded.correlation_id": context.correlation_id,
                "commanded.causation_id": context.causation_id,
                "erlang.exception.kind": :error,
-               "error.type": "Elixir.RuntimeError"
+               "error.type": "RuntimeError"
              }
     end
 

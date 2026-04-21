@@ -151,7 +151,7 @@ defmodule Commanded.OpenTelemetry.AggregateSnapshotTest do
                       )},
                      1000
 
-      assert :otel_attributes.map(span_attrs)[:"error.type"] == "snapshotting_not_configured"
+      assert :otel_attributes.map(span_attrs)[:"error.type"] == ":snapshotting_not_configured"
     end
   end
 
