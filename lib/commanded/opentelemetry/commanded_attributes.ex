@@ -15,6 +15,41 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   - Use dot notation for namespacing (e.g., `commanded.stream.version`).
   - To extend a SemConv namespace, use `commanded.<namespace>.*` (e.g., `commanded.messaging.*`).
 
+  ## Latency vs Lag
+
+  In messaging systems (Kafka, Pulsar, NATS, RabbitMQ), **"lag"** universally refers
+  to **offset-based distance** — how many messages the consumer is behind the head of
+  the stream. It is a count, not a duration.
+
+  This library follows that convention:
+
+  - **"latency"** = a time-based duration (e.g., `commanded.handler.processing_latency`
+    measures elapsed milliseconds from event creation to handler processing).
+  - **"lag"** = reserved for offset-based distance (e.g., a future
+    `commanded.subscription.lag` would measure how many events a subscription is
+    behind the stream head).
+
+  ## Event Handler Span Attributes
+
+  | Attribute | Type | Description |
+  |---|---|---|
+  | `commanded.application` | string | The Commanded application module |
+  | `commanded.handler.name` | string | The handler module name |
+  | `commanded.handler.kind` | string | Type of handler (`event_handler`) |
+  | `commanded.stream.id` | string | The event's stream identifier |
+  | `commanded.stream.version` | integer | The event's stream version |
+  | `commanded.correlation_id` | string | Correlation ID for tracing causality |
+  | `commanded.causation_id` | string | Causation ID for tracing causality |
+  | `commanded.handler.processing_latency` | integer | Milliseconds from event creation to handler processing (delivery latency) |
+
+  Batch event handler spans additionally include:
+
+  | Attribute | Type | Description |
+  |---|---|---|
+  | `commanded.event.count` | integer | Number of events in the batch |
+  | `commanded.batch.first_event_id` | string | Event ID of the first event in the batch |
+  | `commanded.batch.last_event_id` | string | Event ID of the last event in the batch |
+
   ## Example
 
       iex> Commanded.OpenTelemetry.CommandedAttributes.commanded_event()
@@ -173,11 +208,20 @@ defmodule Commanded.OpenTelemetry.CommandedAttributes do
   def commanded_wrong_expected_version_count, do: :"commanded.wrong_expected_version.count"
 
   @doc """
-  Elapsed milliseconds from event creation to handler completion (end-to-end processing latency).
+  Elapsed milliseconds from event creation to handler processing (delivery latency).
+
+  Measures the age of the event at processing time: `now - event.created_at`. This
+  reflects how long the event waited in the store before the handler picked it up,
+  which is a signal of subscription health and backpressure.
+
   For batch handlers, reflects the oldest event in the batch (worst-case latency).
+
+  This is distinct from `messaging.process.duration` (how long the handler took to
+  execute) and from offset-based "lag" (how many events behind the stream head). See
+  the module-level "Latency vs Lag" section for naming rationale.
   """
-  @spec commanded_handler_lag() :: :"commanded.handler.lag"
-  def commanded_handler_lag, do: :"commanded.handler.lag"
+  @spec commanded_handler_processing_latency() :: :"commanded.handler.processing_latency"
+  def commanded_handler_processing_latency, do: :"commanded.handler.processing_latency"
 
   @doc """
   The process registry adapter module (e.g. Commanded.Registration.GlobalRegistry).
