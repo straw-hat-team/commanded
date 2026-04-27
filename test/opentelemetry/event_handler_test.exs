@@ -118,7 +118,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.stream.id": recorded_event.stream_id,
                "commanded.stream.version": 7,
                "commanded.handler.kind": "event_handler",
-               "commanded.handler.lag": 250
+               "commanded.handler.processing_latency": 250
              }
     end
   end
@@ -171,7 +171,7 @@ defmodule Commanded.OpenTelemetry.EventHandlerTest do
                "commanded.handler.kind": "event_handler",
                "commanded.batch.first_event_id": first_event_id,
                "commanded.batch.last_event_id": last_event_id,
-               "commanded.handler.lag": 500
+               "commanded.handler.processing_latency": 500
              }
     end
   end
