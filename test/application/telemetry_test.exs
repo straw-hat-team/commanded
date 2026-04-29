@@ -1,15 +1,17 @@
 defmodule Commanded.Application.TelemetryTest do
   use ExUnit.Case
 
-  alias Commanded.Aggregates.{Lifespan, LifespanAggregate}
-  alias Commanded.Aggregates.LifespanAggregate.Command, as: LifespanCommand
   alias Commanded.DefaultApp
+  alias Commanded.Commands.{TimeoutCommand, TimeoutRouter}
   alias Commanded.Middleware.Commands.Fail
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
+  alias Commanded.TestSupport.RetryStopOnceAggregate
+  alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
   alias Commanded.UUID
 
   setup do
+    start_supervised!(RetryStopOnceAggregate.Tracker)
     start_supervised!(DefaultApp)
     attach_telemetry()
 
@@ -36,14 +38,13 @@ defmodule Commanded.Application.TelemetryTest do
   defmodule RetryExhaustionRouter do
     use Commanded.Commands.Router
 
-    alias Commanded.Aggregates.Lifespan
-    alias Commanded.Aggregates.LifespanAggregate
-    alias Commanded.Aggregates.LifespanAggregate.Command
+    alias Commanded.TestSupport.RetryStopOnceAggregate
+    alias Commanded.TestSupport.RetryStopOnceAggregate.Command
 
     dispatch [Command],
-      to: LifespanAggregate,
+      to: RetryStopOnceAggregate,
       identity: :uuid,
-      lifespan: Lifespan
+      before_execute: :before_execute
   end
 
   test "emit `[:commanded, :application, :dispatch, :start | :stop]` event" do
@@ -91,41 +92,30 @@ defmodule Commanded.Application.TelemetryTest do
   test "emit dispatch stop telemetry when dispatcher retries are exhausted" do
     aggregate_uuid = UUID.uuid4()
 
-    {:ok, ^aggregate_uuid} =
-      Commanded.Aggregates.Supervisor.open_aggregate(
-        DefaultApp,
-        LifespanAggregate,
-        aggregate_uuid
-      )
+    command = %RetryStopOnceCommand{uuid: aggregate_uuid}
 
-    command = %LifespanCommand{uuid: aggregate_uuid, action: :noop, lifespan: :stop}
+    assert {:error, :too_many_attempts} =
+             RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
 
-    results =
-      dispatch_concurrently(fn ->
-        RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
-      end)
+    assert_receive {[:commanded, :application, :dispatch, :start], _, _, _}
 
-    assert Enum.any?(results, &match?({:ok, {:error, :too_many_attempts}}, &1))
+    assert_receive {[:commanded, :application, :dispatch, :stop], _, _,
+                    %{error: :too_many_attempts}}
+  end
 
-    assert Enum.all?(results, fn
-             {:ok, :ok} -> true
-             {:ok, {:error, :too_many_attempts}} -> true
-             _ -> false
-           end)
+  test "emit a single aggregate execute attempt when command execution times out" do
+    command = %TimeoutCommand{aggregate_uuid: UUID.uuid4(), sleep_in_ms: 2_000}
 
-    events = collect_dispatch_events(length(results))
+    assert {:error, error} = TimeoutRouter.dispatch(command, application: DefaultApp)
+    assert error in [:aggregate_execution_failed, :aggregate_execution_timeout]
 
-    starts =
-      Enum.count(events, &match?({[:commanded, :application, :dispatch, :start], _, _, _}, &1))
+    assert_receive {[:commanded, :application, :dispatch, :start], _, _, _}
+    assert_receive {[:commanded, :aggregate, :execute, :start], _, _, _}
 
-    stop_errors =
-      for {[:commanded, :application, :dispatch, :stop], _, _, %{error: error}} <- events do
-        error
-      end
+    refute_receive {[:commanded, :aggregate, :execute, :start], _, _, _}, 200
 
-    assert starts == length(results)
-    assert length(stop_errors) == length(results)
-    assert :too_many_attempts in stop_errors
+    assert_receive {[:commanded, :application, :dispatch, :stop], _, _,
+                    %{error: ^error}}
   end
 
   defp attach_telemetry do
@@ -150,33 +140,5 @@ defmodule Commanded.Application.TelemetryTest do
     on_exit(fn ->
       :telemetry.detach("test-handler")
     end)
-  end
-
-  defp collect_dispatch_events(expected_stops, events \\ []) do
-    stop_count =
-      Enum.count(events, fn
-        {[:commanded, :application, :dispatch, :stop], _, _, _} -> true
-        _ -> false
-      end)
-
-    if stop_count == expected_stops do
-      Enum.reverse(events)
-    else
-      assert_receive event, 1_000
-
-      case event do
-        {[:commanded, :application, :dispatch, _], _, _, _} ->
-          collect_dispatch_events(expected_stops, [event | events])
-
-        _ ->
-          collect_dispatch_events(expected_stops, events)
-      end
-    end
-  end
-
-  defp dispatch_concurrently(fun, count \\ 10) do
-    1..count
-    |> Task.async_stream(fn _ -> fun.() end, ordered: false, timeout: 5_000)
-    |> Enum.to_list()
   end
 end

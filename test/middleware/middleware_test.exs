@@ -4,8 +4,6 @@ defmodule Commanded.Middleware.MiddlewareTest do
   import Commanded.Enumerable
 
   alias Commanded.Commands.ExecutionResult
-  alias Commanded.Aggregates.{Lifespan, LifespanAggregate}
-  alias Commanded.Aggregates.LifespanAggregate.Command, as: LifespanCommand
   alias Commanded.DefaultApp
   alias Commanded.Helpers.CommandAuditMiddleware
 
@@ -19,6 +17,8 @@ defmodule Commanded.Middleware.MiddlewareTest do
   }
 
   alias Commanded.Middleware.Pipeline
+  alias Commanded.TestSupport.RetryStopOnceAggregate
+  alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
   alias Commanded.UUID
 
   defmodule FirstMiddleware do
@@ -71,20 +71,20 @@ defmodule Commanded.Middleware.MiddlewareTest do
   defmodule RetryExhaustionRouter do
     use Commanded.Commands.Router
 
-    alias Commanded.Aggregates.Lifespan
-    alias Commanded.Aggregates.LifespanAggregate
-    alias Commanded.Aggregates.LifespanAggregate.Command
+    alias Commanded.TestSupport.RetryStopOnceAggregate
+    alias Commanded.TestSupport.RetryStopOnceAggregate.Command
 
     middleware CommandAuditMiddleware
 
     dispatch [Command],
-      to: LifespanAggregate,
+      to: RetryStopOnceAggregate,
       identity: :uuid,
-      lifespan: Lifespan
+      before_execute: :before_execute
   end
 
   setup do
     start_supervised!(CommandAuditMiddleware)
+    start_supervised!(RetryStopOnceAggregate.Tracker)
     start_supervised!(DefaultApp)
 
     :ok
@@ -184,38 +184,11 @@ defmodule Commanded.Middleware.MiddlewareTest do
   test "should execute middleware failure callback when dispatcher retries are exhausted" do
     aggregate_uuid = UUID.uuid4()
 
-    {:ok, ^aggregate_uuid} =
-      Commanded.Aggregates.Supervisor.open_aggregate(
-        DefaultApp,
-        LifespanAggregate,
-        aggregate_uuid
-      )
+    command = %RetryStopOnceCommand{uuid: aggregate_uuid}
 
-    command = %LifespanCommand{uuid: aggregate_uuid, action: :noop, lifespan: :stop}
+    assert {:error, :too_many_attempts} =
+             RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
 
-    results =
-      dispatch_concurrently(fn ->
-        RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
-      end)
-
-    assert Enum.any?(results, &match?({:ok, {:error, :too_many_attempts}}, &1))
-
-    assert Enum.all?(results, fn
-             {:ok, :ok} -> true
-             {:ok, {:error, :too_many_attempts}} -> true
-             _ -> false
-           end)
-
-    error_count = Enum.count(results, &match?({:ok, {:error, :too_many_attempts}}, &1))
-    success_count = Enum.count(results, &match?({:ok, :ok}, &1))
-
-    assert CommandAuditMiddleware.count_commands() ==
-             {length(results), success_count, error_count}
-  end
-
-  defp dispatch_concurrently(fun, count \\ 10) do
-    1..count
-    |> Task.async_stream(fn _ -> fun.() end, ordered: false, timeout: 5_000)
-    |> Enum.to_list()
+    assert CommandAuditMiddleware.count_commands() == {1, 0, 1}
   end
 end
