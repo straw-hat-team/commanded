@@ -3,6 +3,14 @@ defmodule Commanded.EventStore.Adapters.EventStore.EventStoreTest do
 
   @moduletag :eventstore_adapter
 
+  alias Commanded.TestSupport.ModuleLoggerLevelHelpers
+
+  setup_all do
+    ModuleLoggerLevelHelpers.suppress_module_log_level(DBConnection.Connection, :warning)
+
+    :ok
+  end
+
   setup do
     start_supervised!(EventStoreApplication)
 

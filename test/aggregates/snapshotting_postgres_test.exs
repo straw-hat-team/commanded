@@ -14,6 +14,7 @@ defmodule Commanded.Aggregates.SnapshottingPostgresTest do
   alias Commanded.Aggregates.ExampleAggregate.Commands.AppendItems
   alias Commanded.EventStore
   alias Commanded.EventStore.SnapshotData
+  alias Commanded.TestSupport.ModuleLoggerLevelHelpers
   alias Commanded.UUID
 
   defmodule App do
@@ -25,6 +26,12 @@ defmodule Commanded.Aggregates.SnapshottingPostgresTest do
       ],
       pubsub: :local,
       registry: :local
+  end
+
+  setup_all do
+    ModuleLoggerLevelHelpers.suppress_module_log_level(DBConnection.Connection, :warning)
+
+    :ok
   end
 
   setup do
