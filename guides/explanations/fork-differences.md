@@ -52,6 +52,21 @@ This fork maintains an independent release cycle to introduce new features and i
 
 ## Features Added ✨
 
+### **Dispatcher Failure Boundary Normalization**
+[PR #98](https://github.com/straw-hat-team/commanded/pull/98)
+
+**Changes:**
+- Moved aggregate execution exit normalization into `Commanded.Aggregates.Aggregate.execute/5`
+- Removed the dispatcher task wrapper used only for `GenServer.call/3` failure isolation
+- Made command timeouts deterministic as `{:error, :aggregate_execution_timeout}`
+- Preserved abnormal aggregate exit reasons as `{:error, :aggregate_execution_failed, reason}` at the aggregate execution boundary
+- Kept public dispatch failures as `{:error, :aggregate_execution_failed}` while preserving `reason` internally for middleware and logging
+
+**Benefits:**
+- Keeps failure normalization in one place instead of splitting it across aggregate and dispatcher layers
+- Preserves dispatcher safety guarantees without extra runtime infrastructure
+- Gives middleware and logs better diagnostic context for abnormal aggregate exits without widening the public dispatch API
+
 ### **UUIDv7 Support**
 [PR #22](https://github.com/straw-hat-team/commanded/pull/22)
 

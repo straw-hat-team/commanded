@@ -265,7 +265,9 @@ defmodule Commanded.Aggregates.Aggregate do
       unavailable during execution.
     - `{:error, :aggregate_execution_timeout}` when the command does not
       complete within the configured timeout.
-    - `{:error, :aggregate_execution_failed}` for other execution-time exits.
+    - `{:error, :aggregate_execution_failed, reason}` for other
+      execution-time exits, preserving the underlying exit reason for
+      middleware and logging.
 
     - `aggregate_version` - the updated version of the aggregate after executing
        the command.
@@ -300,8 +302,11 @@ defmodule Commanded.Aggregates.Aggregate do
       :exit, {:timeout, {GenServer, :call, [^name, {:execute_command, ^context}, ^timeout]}} ->
         {:error, :aggregate_execution_timeout}
 
-      :exit, _reason ->
-        {:error, :aggregate_execution_failed}
+      :exit, {reason, {GenServer, :call, [^name, {:execute_command, ^context}, ^timeout]}} ->
+        {:error, :aggregate_execution_failed, reason}
+
+      :exit, reason ->
+        {:error, :aggregate_execution_failed, reason}
     end
   end
 

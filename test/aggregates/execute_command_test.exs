@@ -159,7 +159,7 @@ defmodule Commanded.Aggregates.ExecuteCommandTest do
              Aggregate.execute(DefaultApp, TimeoutAggregateRoot, aggregate_uuid, context, 50)
   end
 
-  test "returns aggregate_execution_failed when the aggregate exits abnormally" do
+  test "returns aggregate_execution_failed with the exit reason when the aggregate exits abnormally" do
     aggregate_uuid = UUID.uuid4()
 
     assert {:ok, ^aggregate_uuid} =
@@ -176,7 +176,7 @@ defmodule Commanded.Aggregates.ExecuteCommandTest do
       before_execute: :before_execute
     }
 
-    assert {:error, :aggregate_execution_failed} =
+    assert {:error, :aggregate_execution_failed, :boom} =
              Aggregate.execute(DefaultApp, CrashBeforeExecuteAggregate, aggregate_uuid, context)
   end
 
