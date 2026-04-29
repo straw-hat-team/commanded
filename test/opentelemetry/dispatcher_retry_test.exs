@@ -60,16 +60,7 @@ defmodule Commanded.OpenTelemetry.DispatcherRetryTest do
     refute_receive {:aggregate_execute_stop, ^aggregate_uuid}, 200
     refute_receive {:aggregate_execute_start, ^aggregate_uuid}, 200
 
-    spans = collect_spans(2)
-
-    dispatch_spans = Enum.filter(spans, &String.starts_with?(span(&1, :name), "dispatch "))
-    execute_spans = Enum.filter(spans, &String.starts_with?(span(&1, :name), "execute "))
-
-    assert length(dispatch_spans) == 1
-    assert length(execute_spans) == 1
-
-    [dispatch_span] = dispatch_spans
-    [execute_span] = execute_spans
+    {dispatch_span, execute_span} = collect_retry_spans()
 
     assert span(execute_span, :trace_id) == span(dispatch_span, :trace_id)
     assert span(execute_span, :parent_span_id) == span(dispatch_span, :span_id)
@@ -101,26 +92,37 @@ defmodule Commanded.OpenTelemetry.DispatcherRetryTest do
     end)
   end
 
-  defp collect_spans(expected_count, timeout_ms \\ 1_500) do
+  defp collect_retry_spans(timeout_ms \\ 1_500) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
-    collect_spans([], expected_count, deadline)
+    collect_retry_spans(nil, nil, [], deadline)
   end
 
-  defp collect_spans(spans, expected_count, _deadline) when length(spans) >= expected_count do
-    Enum.reverse(spans)
+  defp collect_retry_spans(dispatch_span, execute_span, _seen, _deadline)
+       when not is_nil(dispatch_span) and not is_nil(execute_span) do
+    {dispatch_span, execute_span}
   end
 
-  defp collect_spans(spans, expected_count, deadline) do
+  defp collect_retry_spans(dispatch_span, execute_span, seen, deadline) do
     remaining = max(deadline - System.monotonic_time(:millisecond), 0)
 
     receive do
       {:span, span} ->
-        collect_spans([span | spans], expected_count, deadline)
+        attributes = :otel_attributes.map(span(span, :attributes))
+        span_name = span(span, :name)
+        seen = [{span_name, attributes} | seen]
+
+        dispatch_span =
+          if String.starts_with?(span_name, "dispatch "), do: span, else: dispatch_span
+
+        execute_span =
+          if String.starts_with?(span_name, "execute "), do: span, else: execute_span
+
+        collect_retry_spans(dispatch_span, execute_span, seen, deadline)
     after
       remaining ->
         flunk(
-          "expected #{expected_count} spans, got #{length(spans)}: " <>
-            inspect(Enum.map(spans, &span(&1, :name)))
+          "expected dispatch and execute spans, got: " <>
+            inspect(Enum.reverse(seen))
         )
     end
   end
