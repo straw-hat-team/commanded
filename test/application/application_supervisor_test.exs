@@ -12,7 +12,6 @@ defmodule Commanded.Aggregates.ApplicationSupervisorTest do
 
     test "children are hibernated after inactivity" do
       for module <- [
-            Commanded.Commands.TaskDispatcher,
             Commanded.Aggregates.Supervisor,
             Commanded.Subscriptions,
             Commanded.Subscriptions.Registry

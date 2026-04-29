@@ -67,7 +67,6 @@ defmodule Commanded.Application.Supervisor do
   end
 
   defp app_child_spec(name, config) do
-    task_dispatcher_name = Module.concat([name, Commanded.Commands.TaskDispatcher])
     aggregates_supervisor_name = Module.concat([name, Commanded.Aggregates.Supervisor])
     subscriptions_name = Module.concat([name, Commanded.Subscriptions])
     registry_name = Module.concat([name, Commanded.Subscriptions.Registry])
@@ -75,7 +74,6 @@ defmodule Commanded.Application.Supervisor do
     hibernate_after = Keyword.get(config, :hibernate_after, :infinity)
 
     [
-      {Task.Supervisor, name: task_dispatcher_name, hibernate_after: hibernate_after},
       {Commanded.Aggregates.Supervisor,
        name: aggregates_supervisor_name,
        application: name,

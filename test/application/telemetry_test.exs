@@ -106,8 +106,8 @@ defmodule Commanded.Application.TelemetryTest do
   test "emit a single aggregate execute attempt when command execution times out" do
     command = %TimeoutCommand{aggregate_uuid: UUID.uuid4(), sleep_in_ms: 2_000}
 
-    assert {:error, error} = TimeoutRouter.dispatch(command, application: DefaultApp)
-    assert error in [:aggregate_execution_failed, :aggregate_execution_timeout]
+    assert {:error, :aggregate_execution_timeout} =
+             TimeoutRouter.dispatch(command, application: DefaultApp)
 
     assert_receive {[:commanded, :application, :dispatch, :start], _, _, _}
     assert_receive {[:commanded, :aggregate, :execute, :start], _, _, _}
@@ -115,7 +115,7 @@ defmodule Commanded.Application.TelemetryTest do
     refute_receive {[:commanded, :aggregate, :execute, :start], _, _, _}, 200
 
     assert_receive {[:commanded, :application, :dispatch, :stop], _, _,
-                    %{error: ^error}}
+                    %{error: :aggregate_execution_timeout}}
   end
 
   defp attach_telemetry do

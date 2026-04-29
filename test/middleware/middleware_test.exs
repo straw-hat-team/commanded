@@ -2,6 +2,7 @@ defmodule Commanded.Middleware.MiddlewareTest do
   use ExUnit.Case
 
   import Commanded.Enumerable
+  import ExUnit.CaptureLog
 
   alias Commanded.Commands.ExecutionResult
   alias Commanded.DefaultApp
@@ -20,6 +21,19 @@ defmodule Commanded.Middleware.MiddlewareTest do
   alias Commanded.TestSupport.RetryStopOnceAggregate
   alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
   alias Commanded.UUID
+
+  defmodule CrashCommand do
+    defstruct [:uuid]
+  end
+
+  defmodule CrashBeforeExecuteAggregate do
+    alias Commanded.Aggregates.ExecutionContext
+
+    defstruct []
+
+    def before_execute(_aggregate_state, %ExecutionContext{}), do: Process.exit(self(), :boom)
+    def execute(%__MODULE__{}, %CrashCommand{}), do: []
+  end
 
   defmodule FirstMiddleware do
     @behaviour Commanded.Middleware
@@ -78,6 +92,17 @@ defmodule Commanded.Middleware.MiddlewareTest do
 
     dispatch [Command],
       to: RetryStopOnceAggregate,
+      identity: :uuid,
+      before_execute: :before_execute
+  end
+
+  defmodule CrashRouter do
+    use Commanded.Commands.Router
+
+    middleware Commanded.Middleware.Logger
+
+    dispatch [CrashCommand],
+      to: CrashBeforeExecuteAggregate,
       identity: :uuid,
       before_execute: :before_execute
   end
@@ -150,18 +175,27 @@ defmodule Commanded.Middleware.MiddlewareTest do
   test "should execute middleware failure callback when aggregate process dies" do
     command = %Timeout{aggregate_uuid: UUID.uuid4()}
 
-    # Force command handling to timeout so the aggregate process is terminated
-    :ok =
-      case Router.dispatch(command, application: DefaultApp, timeout: 50) do
-        {:error, :aggregate_execution_timeout} -> :ok
-        {:error, :aggregate_execution_failed} -> :ok
-      end
+    assert {:error, :aggregate_execution_timeout} =
+             Router.dispatch(command, application: DefaultApp, timeout: 50)
 
     {dispatched, succeeded, failed} = CommandAuditMiddleware.count_commands()
 
     assert dispatched == 1
     assert succeeded == 0
     assert failed == 1
+  end
+
+  test "should preserve abnormal aggregate exit reason for middleware logging" do
+    command = %CrashCommand{uuid: UUID.uuid4()}
+
+    log =
+      capture_log(fn ->
+        assert {:error, :aggregate_execution_failed} =
+                 CrashRouter.dispatch(command, application: DefaultApp)
+      end)
+
+    assert log =~ "failed :aggregate_execution_failed"
+    assert log =~ "due to: :boom"
   end
 
   test "should let a middleware update the metadata" do
