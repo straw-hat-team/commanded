@@ -52,8 +52,11 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
 
       on_exit(fn ->
         case previous_level do
-          nil -> Logger.delete_module_level(Commanded.Event.Handler)
-          level -> Logger.put_module_level(Commanded.Event.Handler, level)
+          [] ->
+            Logger.delete_module_level(Commanded.Event.Handler)
+
+          [{Commanded.Event.Handler, level}] ->
+            Logger.put_module_level(Commanded.Event.Handler, level)
         end
       end)
 
