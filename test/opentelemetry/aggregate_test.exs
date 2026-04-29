@@ -2,7 +2,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   use Commanded.OpenTelemetryCase, async: false
   use Commanded.MockEventStoreCase
 
-  alias Commanded.Aggregates.AggregateTelemetryTest
+  alias Commanded.Aggregates.AggregateTelemetrySupport
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.DefaultApp
   alias Commanded.Middleware.Commands.IncrementCount
@@ -678,15 +678,15 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert {:error, :too_many_attempts} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 AggregateTelemetrySupport.ExampleAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(Commanded.Aggregates.AggregateTelemetrySupport.Commands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   handler: AggregateTelemetrySupport.ExampleAggregate,
                    retry_attempts: 0
                  }
                )
@@ -694,7 +694,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.Aggregates.AggregateTelemetrySupport.ExampleAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -727,8 +727,8 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
         build_recorded_event(
           aggregate_uuid,
           1,
-          struct!(Commanded.Aggregates.AggregateTelemetryTest.Event, message: "event"),
-          event_type: "Elixir.Commanded.Aggregates.AggregateTelemetryTest.Event"
+          struct!(Commanded.Aggregates.AggregateTelemetrySupport.Event, message: "event"),
+          event_type: "Elixir.Commanded.Aggregates.AggregateTelemetrySupport.Event"
         )
 
       expect_wrong_expected_version_retry_succeeds(aggregate_uuid, event)
@@ -738,15 +738,15 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert {:ok, 2, _events, _aggregate_state} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 AggregateTelemetrySupport.ExampleAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(Commanded.Aggregates.AggregateTelemetrySupport.Commands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate,
+                   handler: AggregateTelemetrySupport.ExampleAggregate,
                    retry_attempts: 1
                  }
                )
@@ -754,7 +754,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.Aggregates.AggregateTelemetrySupport.ExampleAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -776,6 +776,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       {:attributes, _, _, _, attrs_map} = attrs_tuple
 
       assert attrs_map[:"commanded.wrong_expected_version.count"] == 1
+      refute_receive {:span, _}, 200
     end
 
     test "no wrong_expected_version event when count is 0" do
@@ -788,22 +789,22 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       assert {:ok, 1, _events, _aggregate_state} =
                Aggregate.execute(
                  MockedApp,
-                 AggregateTelemetryTest.ExampleAggregate,
+                 AggregateTelemetrySupport.ExampleAggregate,
                  aggregate_uuid,
                  %ExecutionContext{
                    command:
-                     struct!(Commanded.Aggregates.AggregateTelemetryTest.Commands.Ok,
+                     struct!(Commanded.Aggregates.AggregateTelemetrySupport.Commands.Ok,
                        message: "ok"
                      ),
                    function: :execute,
-                   handler: AggregateTelemetryTest.ExampleAggregate
+                   handler: AggregateTelemetrySupport.ExampleAggregate
                  }
                )
 
       assert_receive {:span,
                       span(
                         name:
-                          "execute Commanded.Aggregates.AggregateTelemetryTest.ExampleAggregate",
+                          "execute Commanded.Aggregates.AggregateTelemetrySupport.ExampleAggregate",
                         kind: :consumer,
                         events: events
                       )},
@@ -822,7 +823,7 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   end
 
   defp start_aggregate(aggregate_uuid, opts) do
-    aggregate = AggregateTelemetryTest.ExampleAggregate
+    aggregate = AggregateTelemetrySupport.ExampleAggregate
     app = Keyword.fetch!(opts, :application)
     name = Aggregate.name(app, aggregate, aggregate_uuid)
 

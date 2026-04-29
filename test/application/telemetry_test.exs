@@ -2,12 +2,16 @@ defmodule Commanded.Application.TelemetryTest do
   use ExUnit.Case
 
   alias Commanded.DefaultApp
+  alias Commanded.Commands.{TimeoutCommand, TimeoutRouter}
   alias Commanded.Middleware.Commands.Fail
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
+  alias Commanded.TestSupport.RetryStopOnceAggregate
+  alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
   alias Commanded.UUID
 
   setup do
+    start_supervised!(RetryStopOnceAggregate.Tracker)
     start_supervised!(DefaultApp)
     attach_telemetry()
 
@@ -29,6 +33,18 @@ defmodule Commanded.Application.TelemetryTest do
       to: CommandHandler,
       aggregate: CounterAggregateRoot,
       identity: :aggregate_uuid
+  end
+
+  defmodule RetryExhaustionRouter do
+    use Commanded.Commands.Router
+
+    alias Commanded.TestSupport.RetryStopOnceAggregate
+    alias Commanded.TestSupport.RetryStopOnceAggregate.Command
+
+    dispatch [Command],
+      to: RetryStopOnceAggregate,
+      identity: :uuid,
+      before_execute: :before_execute
   end
 
   test "emit `[:commanded, :application, :dispatch, :start | :stop]` event" do
@@ -71,6 +87,35 @@ defmodule Commanded.Application.TelemetryTest do
 
     assert %{application: DefaultApp, error: ^error, execution_context: %{command: ^command}} =
              meta
+  end
+
+  test "emit dispatch stop telemetry when dispatcher retries are exhausted" do
+    aggregate_uuid = UUID.uuid4()
+
+    command = %RetryStopOnceCommand{uuid: aggregate_uuid}
+
+    assert {:error, :too_many_attempts} =
+             RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
+
+    assert_receive {[:commanded, :application, :dispatch, :start], _, _, _}
+
+    assert_receive {[:commanded, :application, :dispatch, :stop], _, _,
+                    %{error: :too_many_attempts}}
+  end
+
+  test "emit a single aggregate execute attempt when command execution times out" do
+    command = %TimeoutCommand{aggregate_uuid: UUID.uuid4(), sleep_in_ms: 2_000}
+
+    assert {:error, error} = TimeoutRouter.dispatch(command, application: DefaultApp)
+    assert error in [:aggregate_execution_failed, :aggregate_execution_timeout]
+
+    assert_receive {[:commanded, :application, :dispatch, :start], _, _, _}
+    assert_receive {[:commanded, :aggregate, :execute, :start], _, _, _}
+
+    refute_receive {[:commanded, :aggregate, :execute, :start], _, _, _}, 200
+
+    assert_receive {[:commanded, :application, :dispatch, :stop], _, _,
+                    %{error: ^error}}
   end
 
   defp attach_telemetry do

@@ -17,6 +17,8 @@ defmodule Commanded.Middleware.MiddlewareTest do
   }
 
   alias Commanded.Middleware.Pipeline
+  alias Commanded.TestSupport.RetryStopOnceAggregate
+  alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
   alias Commanded.UUID
 
   defmodule FirstMiddleware do
@@ -66,8 +68,23 @@ defmodule Commanded.Middleware.MiddlewareTest do
              identity: :aggregate_uuid
   end
 
+  defmodule RetryExhaustionRouter do
+    use Commanded.Commands.Router
+
+    alias Commanded.TestSupport.RetryStopOnceAggregate
+    alias Commanded.TestSupport.RetryStopOnceAggregate.Command
+
+    middleware CommandAuditMiddleware
+
+    dispatch [Command],
+      to: RetryStopOnceAggregate,
+      identity: :uuid,
+      before_execute: :before_execute
+  end
+
   setup do
     start_supervised!(CommandAuditMiddleware)
+    start_supervised!(RetryStopOnceAggregate.Tracker)
     start_supervised!(DefaultApp)
 
     :ok
@@ -162,5 +179,16 @@ defmodule Commanded.Middleware.MiddlewareTest do
              "first_metadata" => "first_metadata",
              "updated_by" => "ModifyMetadataMiddleware"
            }
+  end
+
+  test "should execute middleware failure callback when dispatcher retries are exhausted" do
+    aggregate_uuid = UUID.uuid4()
+
+    command = %RetryStopOnceCommand{uuid: aggregate_uuid}
+
+    assert {:error, :too_many_attempts} =
+             RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
+
+    assert CommandAuditMiddleware.count_commands() == {1, 0, 1}
   end
 end

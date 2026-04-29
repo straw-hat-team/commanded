@@ -175,15 +175,10 @@ defmodule Commanded.Commands.Dispatcher do
         maybe_retry(pipeline, payload, context)
 
       {:error, error} ->
-        pipeline
-        |> Pipeline.respond({:error, error})
-        |> after_failure(payload)
+        respond_with_failure(pipeline, payload, error)
 
       {:error, error, reason} ->
-        pipeline
-        |> Pipeline.assign(:error_reason, reason)
-        |> Pipeline.respond({:error, error})
-        |> after_failure(payload)
+        respond_with_failure(pipeline, payload, error, reason)
     end
   end
 
@@ -278,13 +273,26 @@ defmodule Commanded.Commands.Dispatcher do
     }
   end
 
+  defp respond_with_failure(%Pipeline{} = pipeline, %Payload{} = payload, error) do
+    pipeline
+    |> Pipeline.respond({:error, error})
+    |> after_failure(payload)
+  end
+
+  defp respond_with_failure(%Pipeline{} = pipeline, %Payload{} = payload, error, reason) do
+    pipeline
+    |> Pipeline.assign(:error_reason, reason)
+    |> Pipeline.respond({:error, error})
+    |> after_failure(payload)
+  end
+
   defp maybe_retry(pipeline, payload, context) do
     case ExecutionContext.retry(context) do
       {:ok, context} ->
         execute(pipeline, payload, context)
 
-      reply ->
-        reply
+      {:error, error} ->
+        respond_with_failure(pipeline, payload, error)
     end
   end
 end

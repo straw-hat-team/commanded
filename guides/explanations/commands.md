@@ -191,7 +191,9 @@ open_account = %OpenAccount{
 
 ### Timeouts
 
-A command handler has a default timeout of 5 seconds. The same default as a `GenServer.call/3` process call. It must handle the command in this period, otherwise the call fails and the caller process exits.
+A command handler has a default timeout of 5 seconds, the same default as a `GenServer.call/3` process call. It must handle the command in this period; otherwise, dispatch fails with an error tuple.
+
+Depending on where the timeout is observed, this may currently be reported as either `{:error, :aggregate_execution_timeout}` or `{:error, :aggregate_execution_failed}`. Both indicate that command execution did not complete within the configured timeout.
 
 You can configure a different timeout value during command registration by providing a `timeout` option, defined in milliseconds:
 
@@ -214,6 +216,22 @@ You can override the timeout value during command dispatch. This example is disp
 open_account = %OpenAccount{account_number: "ACC123", initial_balance: 1_000}
 
 :ok = BankApp.dispatch(open_account, timeout: 2_000)
+```
+
+Timeouts are not retried automatically. If aggregate hydration or command handling legitimately needs longer, increase the dispatch timeout explicitly.
+
+### Automatic retries
+
+Command dispatch uses the `retry_attempts` budget to retry a small set of failures automatically:
+
+- `{:error, :wrong_expected_version}` while appending events
+- an aggregate stopping after it has been located but before it can execute the command
+- a remote aggregate node becoming unavailable after the aggregate process has been located
+
+The default retry budget is `10`, and you can override it per dispatch:
+
+```elixir
+:ok = BankApp.dispatch(command, retry_attempts: 5)
 ```
 
 ### Multi-command registration

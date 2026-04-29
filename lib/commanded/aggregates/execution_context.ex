@@ -8,7 +8,9 @@ defmodule Commanded.Aggregates.ExecutionContext do
       (e.g. `%OpenBankAccount{...}`).
 
     - `retry_attempts` - the number of retries permitted if an
-      `{:error, :wrong_expected_version}` is encountered when appending events.
+      `{:error, :wrong_expected_version}` is encountered when appending events,
+      or if command dispatch must retry after the aggregate stops or a remote
+      aggregate node becomes unavailable.
 
     - `causation_id` - the UUID assigned to the dispatched command.
 
