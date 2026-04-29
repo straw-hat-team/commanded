@@ -120,34 +120,7 @@ defmodule Commanded.Commands.Dispatcher do
         context.metadata
       )
 
-    task_dispatcher_name = Module.concat([application, Commanded.Commands.TaskDispatcher])
-
-    task =
-      Task.Supervisor.async_nolink(task_dispatcher_name, Aggregate, :execute, [
-        application,
-        aggregate_module,
-        aggregate_uuid,
-        context,
-        timeout
-      ])
-
-    result =
-      case Task.yield(task, timeout) || Task.shutdown(task) do
-        {:ok, result} ->
-          result
-
-        {:exit, {:normal, :aggregate_stopped}} = result ->
-          result
-
-        {:exit, {{:nodedown, _node_name}, {GenServer, :call, _}}} ->
-          {:error, :remote_node_down}
-
-        {:exit, _reason} ->
-          {:error, :aggregate_execution_failed}
-
-        nil ->
-          {:error, :aggregate_execution_timeout}
-      end
+    result = Aggregate.execute(application, aggregate_module, aggregate_uuid, context, timeout)
 
     case result do
       {:ok, aggregate_version, events, aggregate_state} ->

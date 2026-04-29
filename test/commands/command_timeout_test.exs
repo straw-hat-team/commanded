@@ -14,11 +14,8 @@ defmodule Commanded.Commands.CommandTimeoutTest do
     command = %TimeoutCommand{aggregate_uuid: UUID.uuid4(), sleep_in_ms: 2_000}
 
     # Handler is set to take longer than the configured timeout
-    case TimeoutRouter.dispatch(command, application: DefaultApp) do
-      {:error, :aggregate_execution_failed} -> :ok
-      {:error, :aggregate_execution_timeout} -> :ok
-      reply -> flunk("received an unexpected response: #{inspect(reply)}")
-    end
+    assert {:error, :aggregate_execution_timeout} =
+             TimeoutRouter.dispatch(command, application: DefaultApp)
   end
 
   test "should succeed when handler completes within configured timeout" do

@@ -258,6 +258,15 @@ defmodule Commanded.Aggregates.Aggregate do
   replies, this function returns `{:exit, {:normal, :aggregate_stopped}}`.
   `Commanded.Commands.Dispatcher` handles that case by retrying when permitted.
 
+  Infrastructure failures are normalized into return values instead of exiting
+  the caller:
+
+    - `{:error, :remote_node_down}` when a remote aggregate node becomes
+      unavailable during execution.
+    - `{:error, :aggregate_execution_timeout}` when the command does not
+      complete within the configured timeout.
+    - `{:error, :aggregate_execution_failed}` for other execution-time exits.
+
     - `aggregate_version` - the updated version of the aggregate after executing
        the command.
     - `events` - events produced by the command, can be an empty list.
@@ -282,6 +291,17 @@ defmodule Commanded.Aggregates.Aggregate do
 
       :exit, {:normal, {GenServer, :call, [^name, {:execute_command, ^context}, ^timeout]}} ->
         {:exit, {:normal, :aggregate_stopped}}
+
+      :exit,
+      {{:nodedown, _node_name},
+       {GenServer, :call, [^name, {:execute_command, ^context}, ^timeout]}} ->
+        {:error, :remote_node_down}
+
+      :exit, {:timeout, {GenServer, :call, [^name, {:execute_command, ^context}, ^timeout]}} ->
+        {:error, :aggregate_execution_timeout}
+
+      :exit, _reason ->
+        {:error, :aggregate_execution_failed}
     end
   end
 

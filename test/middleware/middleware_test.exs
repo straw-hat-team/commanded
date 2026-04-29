@@ -150,12 +150,8 @@ defmodule Commanded.Middleware.MiddlewareTest do
   test "should execute middleware failure callback when aggregate process dies" do
     command = %Timeout{aggregate_uuid: UUID.uuid4()}
 
-    # Force command handling to timeout so the aggregate process is terminated
-    :ok =
-      case Router.dispatch(command, application: DefaultApp, timeout: 50) do
-        {:error, :aggregate_execution_timeout} -> :ok
-        {:error, :aggregate_execution_failed} -> :ok
-      end
+    assert {:error, :aggregate_execution_timeout} =
+             Router.dispatch(command, application: DefaultApp, timeout: 50)
 
     {dispatched, succeeded, failed} = CommandAuditMiddleware.count_commands()
 

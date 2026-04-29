@@ -4,14 +4,32 @@ defmodule Commanded.Aggregates.ExecuteCommandTest do
   import Commanded.Helpers.ProcessHelper, only: [shutdown_aggregate: 3]
 
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
+  alias Commanded.Commands.{TimeoutAggregateRoot, TimeoutCommand, TimeoutCommandHandler}
   alias Commanded.ExampleDomain.{BankAccount, BankApp, OpenAccountHandler}
   alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
   alias Commanded.ExampleDomain.BankAccount.Events.BankAccountOpened
   alias Commanded.Helpers.Wait
-  alias Commanded.{Registration, UUID}
+  alias Commanded.TestSupport.RetryStopOnceAggregate
+  alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
+  alias Commanded.{DefaultApp, Registration, UUID}
+
+  defmodule CrashCommand do
+    defstruct [:uuid]
+  end
+
+  defmodule CrashBeforeExecuteAggregate do
+    alias Commanded.Aggregates.ExecutionContext
+
+    defstruct []
+
+    def before_execute(_aggregate_state, %ExecutionContext{}), do: Process.exit(self(), :boom)
+    def execute(%__MODULE__{}, %CrashCommand{}), do: []
+  end
 
   setup do
     start_supervised!(BankApp)
+    start_supervised!(DefaultApp)
+    start_supervised!(RetryStopOnceAggregate.Tracker)
 
     :ok
   end
@@ -98,6 +116,68 @@ defmodule Commanded.Aggregates.ExecuteCommandTest do
     {:ok, ^account_number} = open_aggregate(BankAccount, account_number)
 
     assert state_before == Aggregate.aggregate_state(BankApp, BankAccount, account_number)
+  end
+
+  test "returns aggregate_stopped when aggregate stops after being opened" do
+    aggregate_uuid = UUID.uuid4()
+
+    assert {:ok, ^aggregate_uuid} =
+             Commanded.Aggregates.Supervisor.open_aggregate(
+               DefaultApp,
+               RetryStopOnceAggregate,
+               aggregate_uuid
+             )
+
+    context = %ExecutionContext{
+      command: %RetryStopOnceCommand{uuid: aggregate_uuid},
+      handler: RetryStopOnceAggregate,
+      function: :execute,
+      before_execute: :before_execute
+    }
+
+    assert {:exit, {:normal, :aggregate_stopped}} =
+             Aggregate.execute(DefaultApp, RetryStopOnceAggregate, aggregate_uuid, context)
+  end
+
+  test "returns aggregate_execution_timeout when command execution exceeds the timeout" do
+    aggregate_uuid = UUID.uuid4()
+
+    assert {:ok, ^aggregate_uuid} =
+             Commanded.Aggregates.Supervisor.open_aggregate(
+               DefaultApp,
+               TimeoutAggregateRoot,
+               aggregate_uuid
+             )
+
+    context = %ExecutionContext{
+      command: %TimeoutCommand{aggregate_uuid: aggregate_uuid, sleep_in_ms: 200},
+      handler: TimeoutCommandHandler,
+      function: :handle
+    }
+
+    assert {:error, :aggregate_execution_timeout} =
+             Aggregate.execute(DefaultApp, TimeoutAggregateRoot, aggregate_uuid, context, 50)
+  end
+
+  test "returns aggregate_execution_failed when the aggregate exits abnormally" do
+    aggregate_uuid = UUID.uuid4()
+
+    assert {:ok, ^aggregate_uuid} =
+             Commanded.Aggregates.Supervisor.open_aggregate(
+               DefaultApp,
+               CrashBeforeExecuteAggregate,
+               aggregate_uuid
+             )
+
+    context = %ExecutionContext{
+      command: %CrashCommand{uuid: aggregate_uuid},
+      handler: CrashBeforeExecuteAggregate,
+      function: :execute,
+      before_execute: :before_execute
+    }
+
+    assert {:error, :aggregate_execution_failed} =
+             Aggregate.execute(DefaultApp, CrashBeforeExecuteAggregate, aggregate_uuid, context)
   end
 
   describe "command dispatch return" do
