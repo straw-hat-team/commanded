@@ -27,6 +27,7 @@ defmodule Commanded.OpenTelemetryCase do
   setup do
     :application.stop(:opentelemetry)
     :application.set_env(:opentelemetry, :tracer, :otel_tracer_default)
+    :application.set_env(:opentelemetry, :traces_exporter, :none)
 
     :application.set_env(:opentelemetry, :processors, [
       {:otel_batch_processor, %{scheduled_delay_ms: 1}}

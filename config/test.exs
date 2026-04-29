@@ -14,7 +14,9 @@ config :ex_unit,
   capture_log: [level: :debug],
   exclude: [:distributed, :eventstore_adapter]
 
-config :opentelemetry, processors: []
+config :opentelemetry,
+  processors: [],
+  traces_exporter: :none
 
 config :commanded,
   assert_receive_event_timeout: 100,
