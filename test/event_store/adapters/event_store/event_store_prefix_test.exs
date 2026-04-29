@@ -6,8 +6,15 @@ defmodule Commanded.EventStore.Adapters.EventStore.EventStorePrefixTest do
 
   alias Commanded.EventStore.Adapters.EventStore.Storage
   alias Commanded.EventStore.EventStoreTestCase
+  alias Commanded.TestSupport.ModuleLoggerLevelHelpers
   alias EventStore.Tasks.Create
   alias EventStore.Tasks.Init
+
+  setup_all do
+    ModuleLoggerLevelHelpers.suppress_module_log_level(DBConnection.Connection, :warning)
+
+    :ok
+  end
 
   setup_all do
     config1 = Storage.config("prefix1")

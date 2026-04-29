@@ -3,6 +3,13 @@ defmodule Commanded.EventStore.EventStoreTestCase do
 
   alias Commanded.EventStore.Adapters.EventStore
   alias Commanded.EventStore.Adapters.EventStore.Storage
+  alias Commanded.TestSupport.ModuleLoggerLevelHelpers
+
+  setup_all do
+    ModuleLoggerLevelHelpers.suppress_module_log_level(DBConnection.Connection, :warning)
+
+    :ok
+  end
 
   setup_all do
     config = Storage.config()

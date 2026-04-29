@@ -7,6 +7,7 @@ defmodule Commanded.OpenTelemetry.ApplicationE2ETest do
   alias Commanded.OpenTelemetry.Aggregate, as: OTelAggregate
   alias Commanded.OpenTelemetry.Application, as: OTelApplication
   alias Commanded.OpenTelemetry.EventHandler, as: OTelEventHandler
+  alias Commanded.TestSupport.ModuleLoggerLevelHelpers
   alias Commanded.UUID
 
   require OpenTelemetry.Tracer, as: Tracer
@@ -44,6 +45,12 @@ defmodule Commanded.OpenTelemetry.ApplicationE2ETest do
       name: __MODULE__
 
     def handle(_event, _metadata), do: :ok
+  end
+
+  setup_all do
+    ModuleLoggerLevelHelpers.suppress_module_log_level(DBConnection.Connection, :warning)
+
+    :ok
   end
 
   setup do
