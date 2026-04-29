@@ -191,7 +191,7 @@ open_account = %OpenAccount{
 
 ### Timeouts
 
-A command handler has a default timeout of 5 seconds. The same default as a `GenServer.call/3` process call. It must handle the command in this period, otherwise dispatch fails with an error tuple.
+A command handler has a default timeout of 5 seconds, the same default as a `GenServer.call/3` process call. It must handle the command in this period; otherwise, dispatch fails with an error tuple.
 
 Depending on where the timeout is observed, this may currently be reported as either `{:error, :aggregate_execution_timeout}` or `{:error, :aggregate_execution_failed}`. Both indicate that command execution did not complete within the configured timeout.
 
