@@ -50,8 +50,10 @@ defmodule Commanded.OpenTelemetry.DispatcherRetryTest do
   test "aggregate-stop retries emit telemetry per attempt but export spans only for completed attempts" do
     aggregate_uuid = UUID.uuid4()
     command = %RetryStopOnceCommand{uuid: aggregate_uuid}
+    command_name = inspect(RetryStopOnceCommand)
+    causation_id = UUID.uuid4()
 
-    assert :ok = App.dispatch(command, retry_attempts: 1)
+    assert :ok = App.dispatch(command, retry_attempts: 1, command_uuid: causation_id)
 
     assert_receive {:aggregate_execute_start, ^aggregate_uuid}, 1_000
     assert_receive {:aggregate_execute_start, ^aggregate_uuid}, 1_000
@@ -60,7 +62,8 @@ defmodule Commanded.OpenTelemetry.DispatcherRetryTest do
     refute_receive {:aggregate_execute_stop, ^aggregate_uuid}, 200
     refute_receive {:aggregate_execute_start, ^aggregate_uuid}, 200
 
-    {dispatch_span, execute_span} = collect_retry_spans()
+    assert {dispatch_span, execute_span} =
+             collect_retry_spans(aggregate_uuid, command_name, causation_id)
 
     assert span(execute_span, :trace_id) == span(dispatch_span, :trace_id)
     assert span(execute_span, :parent_span_id) == span(dispatch_span, :span_id)
@@ -92,39 +95,59 @@ defmodule Commanded.OpenTelemetry.DispatcherRetryTest do
     end)
   end
 
-  defp collect_retry_spans(timeout_ms \\ 1_500) do
+  defp collect_spans(timeout_ms \\ 1_500) do
     deadline = System.monotonic_time(:millisecond) + timeout_ms
-    collect_retry_spans(nil, nil, [], deadline)
+    collect_spans([], deadline)
   end
 
-  defp collect_retry_spans(dispatch_span, execute_span, _seen, _deadline)
-       when not is_nil(dispatch_span) and not is_nil(execute_span) do
-    {dispatch_span, execute_span}
-  end
-
-  defp collect_retry_spans(dispatch_span, execute_span, seen, deadline) do
+  defp collect_spans(spans, deadline) do
     remaining = max(deadline - System.monotonic_time(:millisecond), 0)
 
     receive do
       {:span, span} ->
-        attributes = :otel_attributes.map(span(span, :attributes))
-        span_name = span(span, :name)
-        seen = [{span_name, attributes} | seen]
-
-        dispatch_span =
-          if String.starts_with?(span_name, "dispatch "), do: span, else: dispatch_span
-
-        execute_span =
-          if String.starts_with?(span_name, "execute "), do: span, else: execute_span
-
-        collect_retry_spans(dispatch_span, execute_span, seen, deadline)
+        collect_spans([span | spans], deadline)
     after
       remaining ->
-        flunk(
-          "expected dispatch and execute spans, got: " <>
-            inspect(Enum.reverse(seen))
-        )
+        Enum.reverse(spans)
     end
+  end
+
+  defp collect_retry_spans(aggregate_uuid, command_name, causation_id) do
+    collect_spans()
+    |> Enum.group_by(&span(&1, :trace_id))
+    |> Enum.find_value(fn {_trace_id, spans} ->
+      dispatch_span =
+        Enum.find(spans, &dispatch_span?(&1, command_name, causation_id))
+
+      execute_span =
+        Enum.find(spans, &execute_span?(&1, aggregate_uuid, command_name, causation_id))
+
+      if dispatch_span && execute_span do
+        {dispatch_span, execute_span}
+      end
+    end)
+  end
+
+  defp dispatch_span?(span, command_name, causation_id) do
+    attributes = span_attributes(span)
+
+    String.starts_with?(span(span, :name), "dispatch ") and
+      attributes[:"commanded.command"] == command_name and
+      attributes[:"messaging.message.id"] == causation_id
+  end
+
+  defp execute_span?(span, aggregate_uuid, command_name, causation_id) do
+    attributes = span_attributes(span)
+
+    String.starts_with?(span(span, :name), "execute ") and
+      attributes[:"commanded.aggregate.uuid"] == aggregate_uuid and
+      attributes[:"commanded.command"] == command_name and
+      attributes[:"messaging.message.id"] == causation_id
+  end
+
+  defp span_attributes(span) do
+    span(span, :attributes)
+    |> :otel_attributes.map()
   end
 
   defp detach_all_handlers do
