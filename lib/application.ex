@@ -358,6 +358,12 @@ defmodule Commanded.Application do
 
         - `timeout` - as described above.
 
+        - `retry_attempts` - the number of automatic retries permitted for
+          optimistic concurrency conflicts while appending events, and
+          infrastructure races where an aggregate stops after it has been
+          located or a remote aggregate node becomes unavailable. The default
+          value is 10. Timeouts are not retried automatically.
+
   Returns `:ok` on success unless the `:returning` option is specified where
   it returns one of `{:ok, aggregate_state}`, `{:ok, aggregate_version}`,
   `{:ok, events}`, or `{:ok, %Commanded.Commands.ExecutionResult{}}`.

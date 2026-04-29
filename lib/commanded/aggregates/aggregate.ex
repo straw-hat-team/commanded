@@ -254,6 +254,10 @@ defmodule Commanded.Aggregates.Aggregate do
   Returns `{:ok, aggregate_version, events}` on success, or `{:error, error}`
   on failure.
 
+  If the aggregate process stops after it has been located but before it
+  replies, this function returns `{:exit, {:normal, :aggregate_stopped}}`.
+  `Commanded.Commands.Dispatcher` handles that case by retrying when permitted.
+
     - `aggregate_version` - the updated version of the aggregate after executing
        the command.
     - `events` - events produced by the command, can be an empty list.

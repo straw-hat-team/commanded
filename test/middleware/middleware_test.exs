@@ -4,6 +4,8 @@ defmodule Commanded.Middleware.MiddlewareTest do
   import Commanded.Enumerable
 
   alias Commanded.Commands.ExecutionResult
+  alias Commanded.Aggregates.{Lifespan, LifespanAggregate}
+  alias Commanded.Aggregates.LifespanAggregate.Command, as: LifespanCommand
   alias Commanded.DefaultApp
   alias Commanded.Helpers.CommandAuditMiddleware
 
@@ -64,6 +66,21 @@ defmodule Commanded.Middleware.MiddlewareTest do
              to: CommandHandler,
              aggregate: CounterAggregateRoot,
              identity: :aggregate_uuid
+  end
+
+  defmodule RetryExhaustionRouter do
+    use Commanded.Commands.Router
+
+    alias Commanded.Aggregates.Lifespan
+    alias Commanded.Aggregates.LifespanAggregate
+    alias Commanded.Aggregates.LifespanAggregate.Command
+
+    middleware CommandAuditMiddleware
+
+    dispatch [Command],
+      to: LifespanAggregate,
+      identity: :uuid,
+      lifespan: Lifespan
   end
 
   setup do
@@ -162,5 +179,43 @@ defmodule Commanded.Middleware.MiddlewareTest do
              "first_metadata" => "first_metadata",
              "updated_by" => "ModifyMetadataMiddleware"
            }
+  end
+
+  test "should execute middleware failure callback when dispatcher retries are exhausted" do
+    aggregate_uuid = UUID.uuid4()
+
+    {:ok, ^aggregate_uuid} =
+      Commanded.Aggregates.Supervisor.open_aggregate(
+        DefaultApp,
+        LifespanAggregate,
+        aggregate_uuid
+      )
+
+    command = %LifespanCommand{uuid: aggregate_uuid, action: :noop, lifespan: :stop}
+
+    results =
+      dispatch_concurrently(fn ->
+        RetryExhaustionRouter.dispatch(command, application: DefaultApp, retry_attempts: 0)
+      end)
+
+    assert Enum.any?(results, &match?({:ok, {:error, :too_many_attempts}}, &1))
+
+    assert Enum.all?(results, fn
+             {:ok, :ok} -> true
+             {:ok, {:error, :too_many_attempts}} -> true
+             _ -> false
+           end)
+
+    error_count = Enum.count(results, &match?({:ok, {:error, :too_many_attempts}}, &1))
+    success_count = Enum.count(results, &match?({:ok, :ok}, &1))
+
+    assert CommandAuditMiddleware.count_commands() ==
+             {length(results), success_count, error_count}
+  end
+
+  defp dispatch_concurrently(fun, count \\ 10) do
+    1..count
+    |> Task.async_stream(fn _ -> fun.() end, ordered: false, timeout: 5_000)
+    |> Enum.to_list()
   end
 end
