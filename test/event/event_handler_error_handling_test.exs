@@ -32,9 +32,10 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
   end
 
   describe "Configured error handling" do
-    setup [:listen_for_telemetry_events, :start_simple_error_handler]
+    setup [:listen_for_telemetry_events]
 
-    test ":stop stops the handler", %{handler: handler, ref: ref} do
+    test ":stop stops the handler" do
+      %{handler: handler, ref: ref} = start_simple_error_handler!()
       AppConfig.__put__(DefaultApp, :on_event_handler_error, :stop)
 
       send_error_event(handler)
@@ -42,8 +43,22 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
       assert_receive {:DOWN, ^ref, :process, ^handler, :failed}
     end
 
-    test ":backoff delays the next attempt", %{handler: handler} do
+    test ":backoff delays the next attempt" do
+      %{handler: handler} = start_simple_error_handler!()
       AppConfig.__put__(DefaultApp, :on_event_handler_error, :backoff)
+      previous_level = Logger.get_module_level(Commanded.Event.Handler)
+
+      Logger.put_module_level(Commanded.Event.Handler, :emergency)
+
+      on_exit(fn ->
+        case previous_level do
+          [] ->
+            Logger.delete_module_level(Commanded.Event.Handler)
+
+          [{Commanded.Event.Handler, level}] ->
+            Logger.put_module_level(Commanded.Event.Handler, level)
+        end
+      end)
 
       # When we sent the error event
       send_error_event(handler)
@@ -60,7 +75,8 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
                      2100
     end
 
-    test "error handler can be a custom module", %{handler: handler, ref: ref} do
+    test "error handler can be a custom module" do
+      %{handler: handler, ref: ref} = start_simple_error_handler!()
       AppConfig.__put__(DefaultApp, :on_event_handler_error, ThreeStrikesErrorHandler)
 
       send_error_event(handler)
@@ -263,15 +279,15 @@ defmodule Commanded.Event.EventHandlerErrorHandlingTest do
     end)
   end
 
-  defp start_simple_error_handler(_) do
+  defp start_simple_error_handler! do
     start_supervised!(DefaultApp)
     handler = start_supervised!(SimpleErrorEventHandler)
     true = Process.unlink(handler)
     ref = Process.monitor(handler)
 
-    [
+    %{
       handler: handler,
       ref: ref
-    ]
+    }
   end
 end
