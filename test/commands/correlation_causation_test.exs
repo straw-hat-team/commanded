@@ -38,7 +38,7 @@ defmodule Commanded.Commands.CorrelationCasuationTest do
       assert [^causation_id] = CommandAuditMiddleware.dispatched_commands(& &1.causation_id)
     end
 
-    test "should be set from `command_uuid` on created event" do
+    test "should fall back to `command_uuid` on created event when not provided" do
       command = %OpenAccount{account_number: "ACC123", initial_balance: 500}
 
       :ok = BankRouter.dispatch(command, application: BankApp)
@@ -46,8 +46,18 @@ defmodule Commanded.Commands.CorrelationCasuationTest do
       [command_uuid] = CommandAuditMiddleware.dispatched_commands(& &1.command_uuid)
       [event] = EventStore.stream_forward(BankApp, "ACC123") |> Enum.to_list()
 
-      # an event's `causation_id` is the dispatched command's `command_uuid`
       assert event.causation_id == command_uuid
+    end
+
+    test "should be set from explicit `:causation_id` dispatch option on created event" do
+      causation_id = UUID.uuid4()
+      command = %OpenAccount{account_number: "ACC123", initial_balance: 500}
+
+      :ok = BankRouter.dispatch(command, application: BankApp, causation_id: causation_id)
+
+      [event] = EventStore.stream_forward(BankApp, "ACC123") |> Enum.to_list()
+
+      assert event.causation_id == causation_id
     end
   end
 
@@ -131,17 +141,11 @@ defmodule Commanded.Commands.CorrelationCasuationTest do
       [account_opened, money_deposited] =
         EventStore.stream_forward(BankApp, "ACC123") |> Enum.to_list()
 
-      # should set command causation id as handled event id
       [_causation_id, causation_id] =
         CommandAuditMiddleware.dispatched_commands(& &1.causation_id)
 
       assert causation_id == account_opened.event_id
-
-      # should set created event causation id as the command uuid
-      [_command_uuid, command_uuid] =
-        CommandAuditMiddleware.dispatched_commands(& &1.command_uuid)
-
-      assert money_deposited.causation_id == command_uuid
+      assert money_deposited.causation_id == account_opened.event_id
     end
 
     def start_account_bonus_handler(_context) do
