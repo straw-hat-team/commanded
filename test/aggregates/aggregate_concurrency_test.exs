@@ -1,11 +1,11 @@
 defmodule Commanded.Aggregates.AggregateConcurrencyTest do
   use Commanded.MockEventStoreCase
 
-  alias Commanded.MockedApp
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.ExampleDomain.{BankAccount, DepositMoneyHandler, OpenAccountHandler}
   alias Commanded.ExampleDomain.BankAccount.Commands.{DepositMoney, OpenAccount}
   alias Commanded.ExampleDomain.BankAccount.Events.MoneyDeposited
+  alias Commanded.MockedApp
   alias Commanded.UUID
 
   describe "concurrency error" do

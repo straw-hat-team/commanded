@@ -3,9 +3,11 @@ defmodule Commanded.Aggregates.AggregateLifespanTest do
 
   alias Commanded.Aggregates.{Aggregate, DefaultLifespanRouter, LifespanAggregate, LifespanRouter}
   alias Commanded.Aggregates.LifespanAggregate.{Command, Event}
+  alias Commanded.DefaultApp
+  alias Commanded.EventStore
+  alias Commanded.Registration
   alias Commanded.TestSupport.Factory
-  alias Commanded.{DefaultApp, EventStore}
-  alias Commanded.{Registration, UUID}
+  alias Commanded.UUID
 
   describe "aggregate lifespan" do
     setup do

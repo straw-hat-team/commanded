@@ -604,13 +604,7 @@ defmodule Commanded.Aggregates.Aggregate do
           {{:ok, []}, state}
 
         %Multi{} = multi ->
-          case Multi.run(multi) do
-            {:error, _error} = reply ->
-              {reply, state}
-
-            {aggregate_state, pending_events} ->
-              persist_events(pending_events, aggregate_state, context, state, from)
-          end
+          run_multi(multi, context, state, from)
 
         {:ok, pending_events} ->
           apply_and_persist_events(pending_events, context, state, from)
@@ -628,6 +622,16 @@ defmodule Commanded.Aggregates.Aggregate do
       Logger.error(Exception.format(:error, error, stacktrace))
 
       {{:error, error, stacktrace}, state}
+  end
+
+  defp run_multi(%Multi{} = multi, context, %Aggregate{} = state, from) do
+    case Multi.run(multi) do
+      {:error, _error} = reply ->
+        {reply, state}
+
+      {aggregate_state, pending_events} ->
+        persist_events(pending_events, aggregate_state, context, state, from)
+    end
   end
 
   defp apply_and_persist_events(pending_events, context, %Aggregate{} = state, from) do

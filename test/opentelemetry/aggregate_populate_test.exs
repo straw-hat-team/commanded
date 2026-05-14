@@ -34,7 +34,7 @@ defmodule Commanded.OpenTelemetry.AggregatePopulateTest do
           ] do
         handlers = :telemetry.list_handlers(event)
 
-        assert length(handlers) >= 1,
+        assert handlers != [],
                "Expected handler for event #{inspect(event)}"
       end
     end

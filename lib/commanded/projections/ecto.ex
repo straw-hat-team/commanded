@@ -360,28 +360,12 @@ if Code.ensure_loaded?(Ecto) do
         defp execute_batch_projection(multi, multi_fn) do
           # This ensures EVERYTHING happens in ONE atomic transaction
           with %Ecto.Multi{} = multi <-
-                 Ecto.Multi.run(multi, :prepare_user_multi, fn _repo,
-                                                               %{
-                                                                 lock_and_filter:
-                                                                   {_current, unseen_events,
-                                                                    _last}
-                                                               } ->
-                   user_multi = multi_fn.(unseen_events, Ecto.Multi.new())
-
-                   case user_multi do
-                     %Ecto.Multi{} ->
-                       {:ok, {unseen_events, user_multi}}
-
-                     other ->
-                       {:error, {:invalid_multi_return, other}}
-                   end
-                 end),
+                 Ecto.Multi.run(multi, :prepare_user_multi, &prepare_user_multi(&1, &2, multi_fn)),
                %Ecto.Multi{} = multi <-
                  Ecto.Multi.merge(multi, fn %{prepare_user_multi: {_unseen_events, user_multi}} ->
                    user_multi
                  end),
                {:ok, changes} <- transaction(multi) do
-            # Get the unseen events from our preparation step
             {unseen_events, _user_multi} = changes.prepare_user_multi
 
             after_update_batch(unseen_events, changes)
@@ -394,6 +378,17 @@ if Code.ensure_loaded?(Ecto) do
 
             {:error, _error} = reply ->
               reply
+          end
+        end
+
+        defp prepare_user_multi(
+               _repo,
+               %{lock_and_filter: {_current, unseen_events, _last}},
+               multi_fn
+             ) do
+          case multi_fn.(unseen_events, Ecto.Multi.new()) do
+            %Ecto.Multi{} = user_multi -> {:ok, {unseen_events, user_multi}}
+            other -> {:error, {:invalid_multi_return, other}}
           end
         end
       end

@@ -363,19 +363,26 @@ defmodule Commanded.Commands.Router do
 
     for command_module <- List.wrap(command_module_or_modules) do
       quote do
-        if Enum.any?(@registered_commands, fn {command_module, _command_opts} ->
-             command_module == unquote(command_module)
-           end) do
-          raise ArgumentError,
-            message:
-              "Command `#{inspect(unquote(command_module))}` has already been registered in router `#{inspect(__MODULE__)}`"
-        end
+        Router.__check_command_not_registered__(
+          __MODULE__,
+          @registered_commands,
+          unquote(command_module)
+        )
 
         @registered_commands {
           unquote(command_module),
           Keyword.merge(@default_dispatch_opts, unquote(opts))
         }
       end
+    end
+  end
+
+  @doc false
+  def __check_command_not_registered__(router, registered_commands, command_module) do
+    if List.keymember?(registered_commands, command_module, 0) do
+      raise ArgumentError,
+        message:
+          "Command `#{inspect(command_module)}` has already been registered in router `#{inspect(router)}`"
     end
   end
 

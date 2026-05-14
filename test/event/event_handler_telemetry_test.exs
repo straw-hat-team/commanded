@@ -5,10 +5,10 @@ defmodule Commanded.Event.EventHandlerTelemetryTest do
   alias Commanded.Event.Handler
   alias Commanded.EventStore.Subscription
 
-  alias Commanded.Helpers.EventFactory
   alias Commanded.Event.{BatchHandler, EchoHandler, ErrorHandlingBatchHandler}
   alias Commanded.Event.EventHandlerTelemetryTest.MockAdapter
   alias Commanded.Event.ReplyEvent
+  alias Commanded.Helpers.EventFactory
 
   setup do
     attach_telemetry()
