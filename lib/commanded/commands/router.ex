@@ -379,7 +379,7 @@ defmodule Commanded.Commands.Router do
 
   @doc false
   def __check_command_not_registered__(router, registered_commands, command_module) do
-    if Enum.any?(registered_commands, fn {existing, _opts} -> existing == command_module end) do
+    if List.keymember?(registered_commands, command_module, 0) do
       raise ArgumentError,
         message:
           "Command `#{inspect(command_module)}` has already been registered in router `#{inspect(router)}`"
