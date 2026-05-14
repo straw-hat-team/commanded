@@ -20,14 +20,10 @@ jobs:
     name: Conventional Commits
     runs-on: ubuntu-latest
     steps:
-      - name: Validate PR title
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          if ! [[ "$PR_TITLE" =~ ^(feat|fix|chore)(\([^)]+\))?!?:\ .+ ]]; then
-            echo "PR title must follow Conventional Commits (feat|fix|chore): $PR_TITLE"
-            exit 1
-          fi
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: webiny/action-conventional-commits@8bc41ff4e7d423d56fa4905f6ff79209a78776c7 # v1.3.0
+        with:
+          allowed-commit-types: "feat,fix,chore"
 
   quality-assurance:
     name: Quality Assurance
