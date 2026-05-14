@@ -1,8 +1,8 @@
 defmodule Commanded.EventStore.Adapters.InMemoryTest do
   use Commanded.EventStore.InMemoryTestCase
 
-  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.Adapters.InMemory
+  alias Commanded.EventStore.AdapterTestData
 
   describe "reset!/0" do
     test "wipes all data from memory", %{event_store_meta: event_store_meta} do

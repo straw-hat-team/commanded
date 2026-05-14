@@ -5,8 +5,8 @@ defmodule Commanded.EventStore.TelemetryTest do
 
   alias Commanded.DefaultApp
   alias Commanded.EventStore
-  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.Adapters.Mock, as: MockEventStore
+  alias Commanded.EventStore.AdapterTestData
   alias Commanded.EventStore.RecordedEvent
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError

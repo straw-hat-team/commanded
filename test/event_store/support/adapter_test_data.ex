@@ -1,10 +1,10 @@
 defmodule Commanded.EventStore.AdapterTestData do
   alias Commanded.Event.Mapper
-  alias Commanded.Helpers.EventFactory
   alias Commanded.EventStore.SnapshotData
   alias Commanded.EventStore.TypeProvider
   alias Commanded.ExampleDomain.BankAccount
   alias Commanded.ExampleDomain.BankAccount.Events.{BankAccountOpened, MoneyDeposited}
+  alias Commanded.Helpers.EventFactory
   alias Commanded.UUID
 
   def build_opened_event(opts \\ []) do

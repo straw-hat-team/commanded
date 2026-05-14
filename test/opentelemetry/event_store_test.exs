@@ -563,12 +563,10 @@ defmodule Commanded.OpenTelemetry.EventStoreTest do
   end
 
   defp detach_handlers do
-    for event <- @events do
-      for suffix <- [:start, :stop, :exception] do
-        for handler <- :telemetry.list_handlers([:commanded, :event_store, event, suffix]) do
-          :telemetry.detach(handler.id)
-        end
-      end
+    for event <- @events,
+        suffix <- [:start, :stop, :exception],
+        handler <- :telemetry.list_handlers([:commanded, :event_store, event, suffix]) do
+      :telemetry.detach(handler.id)
     end
   end
 

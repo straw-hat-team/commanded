@@ -5,13 +5,15 @@ defmodule Commanded.Aggregates.ExecuteCommandTest do
 
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
   alias Commanded.Commands.{TimeoutAggregateRoot, TimeoutCommand, TimeoutCommandHandler}
+  alias Commanded.DefaultApp
   alias Commanded.ExampleDomain.{BankAccount, BankApp, OpenAccountHandler}
   alias Commanded.ExampleDomain.BankAccount.Commands.OpenAccount
   alias Commanded.ExampleDomain.BankAccount.Events.BankAccountOpened
   alias Commanded.Helpers.Wait
+  alias Commanded.Registration
   alias Commanded.TestSupport.RetryStopOnceAggregate
   alias Commanded.TestSupport.RetryStopOnceAggregate.Command, as: RetryStopOnceCommand
-  alias Commanded.{DefaultApp, Registration, UUID}
+  alias Commanded.UUID
 
   defmodule CrashCommand do
     defstruct [:uuid]

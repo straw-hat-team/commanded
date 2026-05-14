@@ -1,8 +1,8 @@
 defmodule Commanded.Application.TelemetryTest do
   use ExUnit.Case
 
-  alias Commanded.DefaultApp
   alias Commanded.Commands.{TimeoutCommand, TimeoutRouter}
+  alias Commanded.DefaultApp
   alias Commanded.Middleware.Commands.Fail
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError

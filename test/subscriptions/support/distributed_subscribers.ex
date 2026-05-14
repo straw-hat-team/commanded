@@ -21,22 +21,7 @@ defmodule Commanded.Subscriptions.DistributedSubscribers do
     reply_to = self()
 
     for node <- nodes do
-      Node.spawn_link(node, fn ->
-        Logger.configure(level: :error)
-
-        {:ok, _pid} = DistributedApp.start_link()
-
-        for subscriber <- Enum.shuffle(all()) do
-          {:ok, _pid} = subscriber.start_link()
-
-          # Sleep to allow subscribers to be distributed amongst all nodes
-          :timer.sleep(100)
-        end
-
-        send(reply_to, {:started, node})
-
-        :timer.sleep(:infinity)
-      end)
+      Node.spawn_link(node, fn -> start_subscribers_on_node(node, reply_to) end)
     end
 
     for node <- nodes do
@@ -48,14 +33,32 @@ defmodule Commanded.Subscriptions.DistributedSubscribers do
     reply_to = self()
 
     for node <- nodes do
-      Node.spawn_link(node, fn ->
-        subscriptions =
-          Subscriptions.all(DistributedApp)
-          |> Enum.map(fn {name, _module, _pid} -> name end)
-          |> Enum.sort()
-
-        send(reply_to, {:subscriptions, node, subscriptions})
-      end)
+      Node.spawn_link(node, fn -> query_subscriptions_on_node(node, reply_to) end)
     end
+  end
+
+  defp start_subscribers_on_node(node, reply_to) do
+    Logger.configure(level: :error)
+
+    {:ok, _pid} = DistributedApp.start_link()
+
+    for subscriber <- Enum.shuffle(all()) do
+      {:ok, _pid} = subscriber.start_link()
+      :timer.sleep(100)
+    end
+
+    send(reply_to, {:started, node})
+
+    :timer.sleep(:infinity)
+  end
+
+  defp query_subscriptions_on_node(node, reply_to) do
+    subscriptions =
+      DistributedApp
+      |> Subscriptions.all()
+      |> Enum.map(fn {name, _module, _pid} -> name end)
+      |> Enum.sort()
+
+    send(reply_to, {:subscriptions, node, subscriptions})
   end
 end

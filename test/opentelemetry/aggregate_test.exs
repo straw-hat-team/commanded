@@ -2,8 +2,8 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
   use Commanded.OpenTelemetryCase, async: false
   use Commanded.MockEventStoreCase
 
-  alias Commanded.Aggregates.AggregateTelemetrySupport
   alias Commanded.Aggregates.{Aggregate, ExecutionContext}
+  alias Commanded.Aggregates.AggregateTelemetrySupport
   alias Commanded.DefaultApp
   alias Commanded.Middleware.Commands.IncrementCount
   alias Commanded.Middleware.Commands.RaiseError
@@ -872,12 +872,10 @@ defmodule Commanded.OpenTelemetry.AggregateTest do
       unsubscribe
     )a
 
-    for event <- event_store_events do
-      for suffix <- [:start, :stop, :exception] do
-        for handler <- :telemetry.list_handlers([:commanded, :event_store, event, suffix]) do
-          :telemetry.detach(handler.id)
-        end
-      end
+    for event <- event_store_events,
+        suffix <- [:start, :stop, :exception],
+        handler <- :telemetry.list_handlers([:commanded, :event_store, event, suffix]) do
+      :telemetry.detach(handler.id)
     end
   end
 end

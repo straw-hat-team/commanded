@@ -6,11 +6,11 @@ defmodule Commanded.Event.EventHandlerBatchTest do
   alias Commanded.EventStore.Subscription
 
   # Test support code
-  alias Commanded.Helpers.EventFactory
   alias Commanded.Event.{BatchHandler, ErrorHandlingBatchHandler}
   alias Commanded.Event.ErrorAggregate.Events.ErrorEvent
   alias Commanded.Event.EventHandlerBatchTest.MockAdapter
   alias Commanded.Event.ReplyEvent
+  alias Commanded.Helpers.EventFactory
 
   describe "batch handling" do
     test "should receive events in batches" do
