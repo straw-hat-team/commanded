@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.7.1](https://github.com/straw-hat-team/commanded/compare/v3.7.0...v3.7.1) (2026-05-14)
+
+
+### Bug Fixes
+
+* **dispatcher:** Honor caller-supplied :causation_id on persisted events ([#103](https://github.com/straw-hat-team/commanded/issues/103)) ([13f88f3](https://github.com/straw-hat-team/commanded/commit/13f88f3e427c8525b76c536f4e5b52590a481254))
+* **dispatcher:** Preserve retry failure guarantees ([#96](https://github.com/straw-hat-team/commanded/issues/96)) ([7a07792](https://github.com/straw-hat-team/commanded/commit/7a07792542999c66d0930964b43c4c4d4704c557))
+* **telemetry:** Rename commanded.handler.lag to commanded.handler.processing_latency ([#95](https://github.com/straw-hat-team/commanded/issues/95)) ([8198884](https://github.com/straw-hat-team/commanded/commit/8198884e5590a093baba03a92008698a0c10bcd3))
+* **test:** Restore full suite projection bootstrap ([#99](https://github.com/straw-hat-team/commanded/issues/99)) ([945b1cf](https://github.com/straw-hat-team/commanded/commit/945b1cf19846598d2fba901061a7df747341a001))
+
 ## [3.7.0](https://github.com/straw-hat-team/commanded/compare/v3.6.1...v3.7.0) (2026-04-21)
 
 
