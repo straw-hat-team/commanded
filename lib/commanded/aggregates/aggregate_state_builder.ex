@@ -62,6 +62,16 @@ defmodule Commanded.Aggregates.AggregateStateBuilder do
     """
   })
 
+  @moduledoc """
+  Builds an aggregate's state by loading its snapshot and/or events from the
+  event store.
+
+  ## Telemetry
+
+  #{telemetry_docs()}
+
+  """
+
   @read_event_batch_size 1_000
 
   @doc """
