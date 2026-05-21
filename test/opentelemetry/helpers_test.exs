@@ -64,6 +64,32 @@ defmodule Commanded.OpenTelemetry.HelpersTest do
       after_ctx = :otel_ctx.get_current()
       assert before_ctx == after_ctx
     end
+
+    test "returns ctx with baggage when only baggage is present" do
+      {links, ctx} = Helpers.extract_propagated_ctx(%{"baggage" => "userId=alice"})
+
+      assert links == []
+      refute ctx == :undefined
+      assert :otel_baggage.get_all(ctx) == %{"userId" => {"alice", []}}
+    end
+
+    test "returns ctx with both span and baggage when both are present" do
+      {_trace_id, _span_id, traceparent} = make_traceparent()
+
+      metadata = %{
+        "traceparent" => traceparent,
+        "baggage" => "userId=alice,tenant=acme"
+      }
+
+      {links, ctx} = Helpers.extract_propagated_ctx(metadata)
+
+      refute ctx == :undefined
+      assert [%{}] = links
+
+      baggage = :otel_baggage.get_all(ctx)
+      assert baggage["userId"] == {"alice", []}
+      assert baggage["tenant"] == {"acme", []}
+    end
   end
 
   describe "clear_ctx/0" do
