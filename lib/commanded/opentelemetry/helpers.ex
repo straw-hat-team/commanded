@@ -21,10 +21,12 @@ defmodule Commanded.OpenTelemetry.Helpers do
       |> :otel_propagator_text_map.extract_to(headers)
 
     span_ctx = :otel_tracer.current_span_ctx(ctx)
+    baggage = :otel_baggage.get_all(ctx)
 
-    case span_ctx do
-      :undefined -> {[], :undefined}
-      span_ctx -> {[OpenTelemetry.link(span_ctx)], ctx}
+    case {span_ctx, map_size(baggage)} do
+      {:undefined, 0} -> {[], :undefined}
+      {:undefined, _} -> {[], ctx}
+      {span_ctx, _} -> {[OpenTelemetry.link(span_ctx)], ctx}
     end
   end
 
@@ -36,6 +38,7 @@ defmodule Commanded.OpenTelemetry.Helpers do
     []
     |> maybe_add_header(metadata, "traceparent")
     |> maybe_add_header(metadata, "tracestate")
+    |> maybe_add_header(metadata, "baggage")
   end
 
   defp maybe_add_header(headers, metadata, key) do

@@ -61,7 +61,8 @@ defmodule Commanded.Event.Handler do
       handler_state: map(),
       first_event_id: binary(),
       last_event_id: binary(),
-      event_count: integer()}
+      event_count: integer(),
+      flush_reason: :size | :timeout | :immediate}
     """
   })
 
@@ -79,6 +80,7 @@ defmodule Commanded.Event.Handler do
       last_event_id: binary(),
       event_count: integer(),
       recorded_event: RecordedEvent.t() | nil,
+      flush_reason: :size | :timeout | :immediate,
       optional(:error) => any()}
     """
   })
@@ -97,6 +99,7 @@ defmodule Commanded.Event.Handler do
       first_event_id: binary(),
       last_event_id: binary(),
       event_count: integer(),
+      flush_reason: :size | :timeout | :immediate,
       kind: :throw | :error | :exit,
       reason: any(),
       optional(:stacktrace) => list()}
@@ -646,8 +649,14 @@ defmodule Commanded.Event.Handler do
         - :subscribe_to - which stream to subscribe to can be either `:all` to
           subscribe to all events or a named stream (default: `:all`).
 
-        - :batch_size - the size of batches to deliver to `handle_batch` in batched
-          mode.
+        - :batch_size - controls the EventStore subscription's in-flight buffer
+          size. When `batch_timeout` is also set, this is the maximum number of
+          events the handler buffers before flushing. Enables `handle_batch/1`.
+
+        - :batch_timeout - maximum milliseconds to wait for events to accumulate
+          in the handler buffer before flushing. Defaults to `:infinity` (no
+          buffering; events processed immediately as delivered). Requires
+          `:batch_size`.
 
       The default options supported by `GenServer.start_link/3` are supported,
       including the `:hibernate_after` option which allows the process to go
@@ -734,7 +743,8 @@ defmodule Commanded.Event.Handler do
     :subscribe_to,
     :subscription_opts,
     :state,
-    :batch_size
+    :batch_size,
+    :batch_timeout
   ]
 
   @doc false
@@ -753,6 +763,12 @@ defmodule Commanded.Event.Handler do
             "both `:concurrency` and `:batch_size` are specified, this is not yet supported. Please choose one or the other."
     end
 
+    if Keyword.has_key?(config, :batch_timeout) and not Keyword.has_key?(config, :batch_size) do
+      raise ArgumentError,
+            inspect(module) <>
+              " :batch_timeout requires :batch_size. Remove the timeout or configure batching."
+    end
+
     {application, config} = Keyword.pop(config, :application)
 
     unless application do
@@ -766,20 +782,37 @@ defmodule Commanded.Event.Handler do
     end
 
     {batch_size, config} = Keyword.pop(config, :batch_size)
+    {batch_timeout, config} = Keyword.pop(config, :batch_timeout, :infinity)
+
+    unless is_nil(batch_size) or (is_integer(batch_size) and batch_size > 0) do
+      raise ArgumentError,
+            inspect(module) <>
+              " :batch_size must be nil or positive integer, got: " <> inspect(batch_size)
+    end
+
+    unless batch_timeout == :infinity or (is_integer(batch_timeout) and batch_timeout > 0) do
+      raise ArgumentError,
+            inspect(module) <>
+              " :batch_timeout must be :infinity or positive integer, got: " <>
+              inspect(batch_timeout)
+    end
 
     config =
       case batch_size do
         nil ->
-          # Delegate to `handle_event/2` when `batch_size` is not specified
-          Keyword.put(config, :handler_callback, :event)
+          config
+          |> Keyword.put(:handler_callback, :event)
+          |> Keyword.put(:batch_size, nil)
+          |> Keyword.put(:batch_timeout, :infinity)
 
-        size when is_integer(size) ->
+        size when is_integer(size) and size > 0 ->
           config
           |> Keyword.update(:subscription_opts, [buffer_size: size], fn opts ->
             Keyword.put(opts, :buffer_size, size)
           end)
-          # Delegate to `handle_batch/2` when `batch_size` is specified
           |> Keyword.put(:handler_callback, :batch)
+          |> Keyword.put(:batch_size, size)
+          |> Keyword.put(:batch_timeout, batch_timeout)
       end
 
     {application, name, config}
@@ -823,7 +856,11 @@ defmodule Commanded.Event.Handler do
     :handler_state,
     :last_seen_event,
     :subscription,
-    :subscribe_timer
+    :subscribe_timer,
+    :batch_size,
+    :batch_timer_ref,
+    batch_timeout: :infinity,
+    batch_buffer: []
   ]
 
   @doc false
@@ -842,7 +879,11 @@ defmodule Commanded.Event.Handler do
       handler_callback: Keyword.fetch!(handler_opts, :handler_callback),
       handler_state: Keyword.get(handler_opts, :state),
       consistency: consistency,
-      subscription: subscription
+      subscription: subscription,
+      batch_size: Keyword.get(handler_opts, :batch_size),
+      batch_timeout: Keyword.get(handler_opts, :batch_timeout, :infinity),
+      batch_timer_ref: nil,
+      batch_buffer: []
     }
 
     with {:ok, pid} <- Registration.start_link(application, name, __MODULE__, handler, start_opts) do
@@ -940,23 +981,45 @@ defmodule Commanded.Event.Handler do
   @doc false
   @impl GenServer
   def handle_info({:events, events}, state) do
-    %Handler{handler_callback: callback} = state
-
-    processor =
-      case callback do
-        :event -> fn events, state -> Enum.reduce(events, state, &handle_event/2) end
-        :batch -> &handle_batch/2
-      end
+    %Handler{handler_callback: callback, batch_timeout: batch_timeout} = state
 
     Logger.debug(describe(state) <> " received events: #{inspect(events)}")
 
     try do
-      state = processor.(events, state)
+      state =
+        case {callback, batch_timeout} do
+          {:event, _} ->
+            Enum.reduce(events, state, &handle_event/2)
+
+          {:batch, :infinity} ->
+            handle_batch(events, state)
+
+          {:batch, _timeout} ->
+            buffer_and_maybe_flush(events, state)
+        end
 
       {:noreply, state}
     catch
       {:error, reason} ->
         # Stop after event handling returned an error
+        {:stop, reason, state}
+    end
+  end
+
+  @doc false
+  @impl GenServer
+  def handle_info(:flush_batch_timeout, state) do
+    %Handler{batch_buffer: buffer} = state
+
+    Logger.debug(
+      describe(state) <> " flushing batch due to timeout: #{length(buffer || [])} event(s)"
+    )
+
+    try do
+      state = flush_batch_buffer(state, :timeout)
+      {:noreply, state}
+    catch
+      {:error, reason} ->
         {:stop, reason, state}
     end
   end
@@ -1128,6 +1191,70 @@ defmodule Commanded.Event.Handler do
 
         next = fn context, state -> handle_event(event, context, state) end
         handle_event_error(error, event, failure_context, state, next)
+    end
+  end
+
+  defp buffer_and_maybe_flush(events, %Handler{} = state) do
+    %Handler{batch_buffer: buffer, batch_size: batch_size} = state
+
+    new_buffer = (buffer || []) ++ events
+    state = %Handler{state | batch_buffer: new_buffer} |> maybe_start_batch_timer()
+
+    if length(new_buffer) >= batch_size do
+      state
+      |> cancel_batch_timer()
+      |> flush_batch_buffer(:size)
+    else
+      state
+    end
+  end
+
+  defp flush_batch_buffer(%Handler{batch_buffer: buffer} = state, _flush_reason)
+       when buffer in [nil, []],
+       do: state
+
+  defp flush_batch_buffer(%Handler{batch_buffer: buffer} = state, flush_reason) do
+    Logger.debug(
+      describe(state) <> " flushing batch of #{length(buffer)} event(s) due to #{flush_reason}"
+    )
+
+    state = %Handler{state | batch_buffer: [], batch_timer_ref: nil}
+    handle_batch(buffer, %{flush_reason: flush_reason}, state)
+  end
+
+  defp maybe_start_batch_timer(%Handler{batch_buffer: buffer} = state) when buffer in [nil, []],
+    do: state
+
+  defp maybe_start_batch_timer(%Handler{batch_timeout: :infinity} = state), do: state
+
+  defp maybe_start_batch_timer(
+         %Handler{batch_timer_ref: nil, batch_timeout: batch_timeout} = state
+       )
+       when is_integer(batch_timeout) do
+    timer_ref = Process.send_after(self(), :flush_batch_timeout, batch_timeout)
+    %Handler{state | batch_timer_ref: timer_ref}
+  end
+
+  defp maybe_start_batch_timer(state), do: state
+
+  defp cancel_batch_timer(%Handler{batch_timer_ref: nil} = state), do: state
+
+  defp cancel_batch_timer(%Handler{batch_timer_ref: ref} = state) do
+    case Process.cancel_timer(ref) do
+      false ->
+        drain_flush_batch_timeout_message()
+        %Handler{state | batch_timer_ref: nil}
+
+      _remaining ->
+        %Handler{state | batch_timer_ref: nil}
+    end
+  end
+
+  defp drain_flush_batch_timeout_message do
+    receive do
+      :flush_batch_timeout -> :ok
+    after
+      0 -> :ok
     end
   end
 
@@ -1538,7 +1665,8 @@ defmodule Commanded.Event.Handler do
       recorded_event: nil,
       first_event_id: first_event.event_id,
       last_event_id: last_event.event_id,
-      event_count: length(recorded_events)
+      event_count: length(recorded_events),
+      flush_reason: Map.get(context, :flush_reason, :immediate)
     }
   end
 
