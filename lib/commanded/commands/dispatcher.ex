@@ -158,7 +158,6 @@ defmodule Commanded.Commands.Dispatcher do
   defp to_execution_context(%Pipeline{} = pipeline, %Payload{} = payload) do
     %Pipeline{
       command: command,
-      command_uuid: command_uuid,
       causation_id: causation_id,
       metadata: metadata
     } = pipeline
@@ -175,7 +174,8 @@ defmodule Commanded.Commands.Dispatcher do
 
     %ExecutionContext{
       command: command,
-      causation_id: causation_id || command_uuid,
+      # `causation_id` is resolved at the router boundary (#624)
+      causation_id: causation_id,
       correlation_id: correlation_id,
       metadata: metadata,
       handler: handler_module,
