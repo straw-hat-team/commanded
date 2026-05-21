@@ -187,6 +187,31 @@ end
 - Event handlers can extract trace context to create span links or parent-child relationships
 - Non-invasive - only adds metadata when a span is active
 
+### **W3C Baggage Propagation Middleware**
+[PR #108](https://github.com/straw-hat-team/commanded/pull/108)
+
+**Changes:**
+- Added `Commanded.Middleware.BaggagePropagator` middleware for propagating OpenTelemetry baggage
+- Captures the current baggage and stores it in event metadata using the W3C Baggage standard
+- Consumer-side helpers updated to rebuild baggage into the extracted OpenTelemetry context, including the baggage-only case (no `traceparent`)
+
+**Usage:**
+```elixir
+defmodule MyApp.Router do
+  use Commanded.Commands.Router
+
+  middleware Commanded.Middleware.TraceContextPropagator
+  middleware Commanded.Middleware.BaggagePropagator
+
+  # ... your command routes
+end
+```
+
+**Benefits:**
+- Propagates user-defined name/value pairs (e.g. `tenant_id`, `user_id`) from command dispatch to event handlers
+- Independent of trace context — W3C Baggage and W3C Trace Context are separate specifications, so each is opt-in via its own middleware
+- Router-level declaration makes baggage propagation visible at the call site, since baggage entries persist in event metadata for the lifetime of the stream
+
 ### **Aggregate Identity Protocol**
 [PR #43](https://github.com/straw-hat-team/commanded/pull/43)
 
